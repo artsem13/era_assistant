@@ -20,20 +20,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:gravity="center"
-        android:text="Готова к работе" />
-
-    <Button
-        android:id="@+id/startButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="30dp"
-        android:text="Отправить тестовое сообщение" />
+        android:text="Готова к исследованию" />
 
     <Button
         android:id="@+id/voiceButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="Запустить голосовой ChatGPT" />
+        android:layout_marginTop="24dp"
+        android:text="Запустить ChatGPT" />
 
 </LinearLayout>
