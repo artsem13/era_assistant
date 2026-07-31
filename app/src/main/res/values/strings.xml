@@ -1,0 +1,9 @@
+<resources>
+
+    <string name="app_name">Эра</string>
+
+    <string name="accessibility_service_description">
+        Автоматически нажимает кнопку отправки в ChatGPT после передачи сообщения из Эры.
+    </string>
+
+</resources>
