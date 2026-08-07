@@ -2,6 +2,8 @@ package com.era.assistant
 
 import android.app.KeyguardManager
 import android.content.ContentValues
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Environment
 import android.os.PowerManager
@@ -20,6 +22,8 @@ class EraVoiceInteractionService : VoiceInteractionService() {
         writeEvent(
             "onReady"
         )
+
+        playShortTone()
     }
 
     override fun onLaunchVoiceAssistFromKeyguard() {
@@ -36,6 +40,27 @@ class EraVoiceInteractionService : VoiceInteractionService() {
         )
 
         super.onShutdown()
+    }
+
+    private fun playShortTone() {
+        try {
+            val toneGenerator =
+                ToneGenerator(
+                    AudioManager.STREAM_NOTIFICATION,
+                    100
+                )
+
+            toneGenerator.startTone(
+                ToneGenerator.TONE_PROP_BEEP,
+                500
+            )
+
+            Thread.sleep(600)
+
+            toneGenerator.release()
+
+        } catch (_: Exception) {
+        }
     }
 
     private fun writeEvent(
@@ -171,6 +196,7 @@ class EraVoiceInteractionService : VoiceInteractionService() {
                 text,
                 Charsets.UTF_8
             )
+
         } catch (_: Exception) {
         }
     }

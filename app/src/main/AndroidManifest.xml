@@ -10,6 +10,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
+		<activity
+            android:name=".EraKeyguardTestActivity"
+            android:exported="false"
+            android:excludeFromRecents="true" />
 
         <activity
             android:name=".MainActivity"

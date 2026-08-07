@@ -1,36 +1,47 @@
 package com.era.assistant
 
 import android.content.Context
+import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
-import android.util.Log
+import android.view.View
+import android.widget.TextView
 
 class EraVoiceInteractionSession(
     context: Context
 ) : VoiceInteractionSession(context) {
 
+    override fun onCreateContentView(): View {
+
+        return TextView(context).apply {
+
+            text =
+                "ЭРА\n\nVoiceInteractionSession работает"
+
+            textSize = 24f
+
+            gravity =
+                android.view.Gravity.CENTER
+
+            setPadding(
+                40,
+                40,
+                40,
+                40
+            )
+        }
+    }
+
     override fun onShow(
-        args: android.os.Bundle?,
+        args: Bundle?,
         showFlags: Int
     ) {
-        super.onShow(args, showFlags)
-
-        Log.d(
-            TAG,
-            "Era VoiceInteractionSession shown"
+        super.onShow(
+            args,
+            showFlags
         )
     }
 
     override fun onHide() {
-        Log.d(
-            TAG,
-            "Era VoiceInteractionSession hidden"
-        )
-
         super.onHide()
-    }
-
-    companion object {
-        private const val TAG =
-            "EraVoiceSession"
     }
 }

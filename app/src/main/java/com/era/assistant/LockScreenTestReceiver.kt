@@ -20,14 +20,6 @@ class LockScreenTestReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent?
     ) {
-        val report = StringBuilder()
-
-        report.append("ERA LOCK SCREEN WAKE TEST\n")
-        report.append("=========================\n")
-        report.append("Time: ")
-            .append(formatDate(Date()))
-            .append("\n\n")
-
         val powerManager =
             context.getSystemService(
                 Context.POWER_SERVICE
@@ -38,56 +30,33 @@ class LockScreenTestReceiver : BroadcastReceiver() {
                 Context.KEYGUARD_SERVICE
             ) as KeyguardManager
 
-        report.append("screenInteractive=")
-            .append(powerManager.isInteractive)
-            .append("\n")
+        val now = Date()
 
-        report.append("deviceLocked=")
-            .append(keyguardManager.isDeviceLocked)
-            .append("\n")
+        val report =
+            buildString {
+                append("ERA TIMER CONTROL TEST\n")
+                append("======================\n")
 
-        report.append("keyguardLocked=")
-            .append(keyguardManager.isKeyguardLocked)
-            .append("\n\n")
+                append("receiverTime=")
+                append(formatDate(now))
+                append("\n")
 
-        val wakeIntent =
-            Intent(
-                context,
-                LockScreenWakeActivity::class.java
-            )
+                append("screenInteractive=")
+                append(powerManager.isInteractive)
+                append("\n")
 
-        wakeIntent.addFlags(
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TOP
-        )
+                append("deviceLocked=")
+                append(keyguardManager.isDeviceLocked)
+                append("\n")
 
-        try {
-            context.startActivity(
-                wakeIntent
-            )
-
-            report.append(
-                "wakeActivityStart=SUCCESS\n"
-            )
-        } catch (error: Exception) {
-            report.append(
-                "wakeActivityStart=ERROR\n"
-            )
-
-            report.append("error=")
-                .append(
-                    error.javaClass.simpleName
-                )
-                .append(": ")
-                .append(
-                    error.message ?: ""
-                )
-                .append("\n")
-        }
+                append("keyguardLocked=")
+                append(keyguardManager.isKeyguardLocked)
+                append("\n")
+            }
 
         saveReport(
             context,
-            report.toString()
+            report
         )
     }
 
@@ -103,7 +72,7 @@ class LockScreenTestReceiver : BroadcastReceiver() {
             ).format(Date())
 
         val fileName =
-            "era_lock_wake_test_$timestamp.txt"
+            "era_timer_control_$timestamp.txt"
 
         if (
             Build.VERSION.SDK_INT >=
@@ -141,36 +110,31 @@ class LockScreenTestReceiver : BroadcastReceiver() {
                     )
 
                 if (uri != null) {
-                    val stream =
-                        context.contentResolver
-                            .openOutputStream(uri)
 
-                    if (stream != null) {
-                        val writer =
-                            stream.bufferedWriter(
-                                Charsets.UTF_8
-                            )
-
-                        writer.write(text)
-                        writer.flush()
-                        writer.close()
-
-                        values.clear()
-
-                        values.put(
-                            MediaStore.MediaColumns.IS_PENDING,
-                            0
+                    context.contentResolver
+                        .openOutputStream(uri)
+                        ?.bufferedWriter(
+                            Charsets.UTF_8
                         )
+                        ?.use {
+                            it.write(text)
+                        }
 
-                        context.contentResolver.update(
-                            uri,
-                            values,
-                            null,
-                            null
-                        )
+                    values.clear()
 
-                        return "Download/Era/$fileName"
-                    }
+                    values.put(
+                        MediaStore.MediaColumns.IS_PENDING,
+                        0
+                    )
+
+                    context.contentResolver.update(
+                        uri,
+                        values,
+                        null,
+                        null
+                    )
+
+                    return "Download/Era/$fileName"
                 }
 
             } catch (_: Exception) {
@@ -191,6 +155,7 @@ class LockScreenTestReceiver : BroadcastReceiver() {
     ): String? {
 
         return try {
+
             val directory =
                 context.getExternalFilesDir(
                     Environment.DIRECTORY_DOCUMENTS
