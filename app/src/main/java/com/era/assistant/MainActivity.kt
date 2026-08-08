@@ -6,8 +6,11 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.PopupMenu
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -29,21 +32,21 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_API_KEY_URI = "api_key_uri"
     }
 
-    private lateinit var statusText: TextView
     private lateinit var messageInput: EditText
     private lateinit var responseText: TextView
     private lateinit var sendApiButton: Button
+    private lateinit var chatScrollView: ScrollView
 
     private val openAiClient =
         OpenAiClient()
+
+    private val chatHistory =
+        StringBuilder()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
-
-        statusText =
-            findViewById(R.id.statusText)
 
         messageInput =
             findViewById(R.id.messageInput)
@@ -54,66 +57,73 @@ class MainActivity : AppCompatActivity() {
         sendApiButton =
             findViewById(R.id.sendApiButton)
 
-        val apiKeyButton =
-            findViewById<Button>(R.id.apiKeyButton)
+        chatScrollView =
+            findViewById(R.id.chatScrollView)
 
-        val voiceButton =
-            findViewById<Button>(R.id.voiceButton)
-
-        val lockTestButton =
-            findViewById<Button>(R.id.lockTestButton)
-
-        apiKeyButton.setOnClickListener {
-            chooseApiKeyFile()
-        }
+        val menuButton =
+            findViewById<Button>(R.id.menuButton)
 
         sendApiButton.setOnClickListener {
             sendMessageToSphere()
         }
 
-        voiceButton.setOnClickListener {
+        menuButton.setOnClickListener {
+            showMainMenu(it)
+        }
 
-            if (!isAccessibilityServiceEnabled()) {
+        responseText.text =
+            "Начни разговор со Сферой."
+    }
 
-                statusText.text =
-                    "Сначала включи службу Эры"
+    private fun showMainMenu(
+        anchor: View
+    ) {
 
-                Toast.makeText(
-                    this,
-                    "Включи службу «Эра — отправка сообщений»",
-                    Toast.LENGTH_LONG
-                ).show()
-
-                openAccessibilitySettings()
-
-                return@setOnClickListener
-            }
-
-            saveActionMode(
-                ACTION_START_VOICE
+        val popupMenu =
+            PopupMenu(
+                this,
+                anchor
             )
 
-            statusText.text =
-                "Запускаю ChatGPT"
+        popupMenu.menu.add(
+            "Выбрать API-ключ"
+        )
 
-            openChatGpt()
+        popupMenu.menu.add(
+            "Запустить ChatGPT"
+        )
+
+        popupMenu.menu.add(
+            "Тест блокировки — 10 сек"
+        )
+
+        popupMenu.setOnMenuItemClickListener {
+            item ->
+
+            when (
+                item.title.toString()
+            ) {
+
+                "Выбрать API-ключ" -> {
+                    chooseApiKeyFile()
+                    true
+                }
+
+                "Запустить ChatGPT" -> {
+                    startChatGptFromMenu()
+                    true
+                }
+
+                "Тест блокировки — 10 сек" -> {
+                    startLockTestFromMenu()
+                    true
+                }
+
+                else -> false
+            }
         }
 
-        lockTestButton.setOnClickListener {
-
-            scheduleLockScreenTest()
-
-            statusText.text =
-                "Тест через 10 секунд. Блокируй телефон."
-
-            Toast.makeText(
-                this,
-                "Есть 10 секунд. Заблокируй телефон.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-
-        updateApiKeyStatus()
+        popupMenu.show()
     }
 
     private fun sendMessageToSphere() {
@@ -147,26 +157,26 @@ class MainActivity : AppCompatActivity() {
 
         if (apiKeyUri == null) {
 
-            statusText.text =
-                "API-ключ не подключён"
-
             Toast.makeText(
                 this,
-                "Сначала выбери файл API-ключа",
+                "Сначала выбери API-ключ через меню ⋮",
                 Toast.LENGTH_LONG
             ).show()
 
             return
         }
 
+        appendUserMessage(
+            message
+        )
+
+        messageInput.setText("")
+
         sendApiButton.isEnabled =
             false
 
-        statusText.text =
+        sendApiButton.text =
             "Сфера думает..."
-
-        responseText.text =
-            "Ожидаю ответ..."
 
         openAiClient.sendMessage(
             context = this,
@@ -180,11 +190,12 @@ class MainActivity : AppCompatActivity() {
                     sendApiButton.isEnabled =
                         true
 
-                    statusText.text =
-                        "Ответ получен"
+                    sendApiButton.text =
+                        "Спросить Сферу"
 
-                    responseText.text =
+                    appendSphereMessage(
                         answer
+                    )
                 }
             },
 
@@ -195,14 +206,129 @@ class MainActivity : AppCompatActivity() {
                     sendApiButton.isEnabled =
                         true
 
-                    statusText.text =
-                        "Ошибка API"
+                    sendApiButton.text =
+                        "Спросить Сферу"
 
-                    responseText.text =
+                    appendErrorMessage(
                         error
+                    )
+
+                    Toast.makeText(
+                        this,
+                        "Ошибка API",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         )
+    }
+
+    private fun appendUserMessage(
+        message: String
+    ) {
+
+        if (chatHistory.isNotEmpty()) {
+            chatHistory.append("\n\n")
+        }
+
+        chatHistory.append(
+            "Ты:\n"
+        )
+
+        chatHistory.append(
+            message
+        )
+
+        updateChatHistory()
+    }
+
+    private fun appendSphereMessage(
+        message: String
+    ) {
+
+        if (chatHistory.isNotEmpty()) {
+            chatHistory.append("\n\n")
+        }
+
+        chatHistory.append(
+            "Сфера:\n"
+        )
+
+        chatHistory.append(
+            message
+        )
+
+        updateChatHistory()
+    }
+
+    private fun appendErrorMessage(
+        message: String
+    ) {
+
+        if (chatHistory.isNotEmpty()) {
+            chatHistory.append("\n\n")
+        }
+
+        chatHistory.append(
+            "Ошибка:\n"
+        )
+
+        chatHistory.append(
+            message
+        )
+
+        updateChatHistory()
+    }
+
+    private fun updateChatHistory() {
+
+        responseText.text =
+            chatHistory.toString()
+
+        scrollChatToBottom()
+    }
+
+    private fun scrollChatToBottom() {
+
+        chatScrollView.post {
+
+            chatScrollView.fullScroll(
+                View.FOCUS_DOWN
+            )
+        }
+    }
+
+    private fun startChatGptFromMenu() {
+
+        if (!isAccessibilityServiceEnabled()) {
+
+            Toast.makeText(
+                this,
+                "Включи службу «Эра — отправка сообщений»",
+                Toast.LENGTH_LONG
+            ).show()
+
+            openAccessibilitySettings()
+
+            return
+        }
+
+        saveActionMode(
+            ACTION_START_VOICE
+        )
+
+        openChatGpt()
+    }
+
+    private fun startLockTestFromMenu() {
+
+        scheduleLockScreenTest()
+
+        Toast.makeText(
+            this,
+            "Есть 10 секунд. Заблокируй телефон.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun chooseApiKeyFile() {
@@ -271,38 +397,11 @@ class MainActivity : AppCompatActivity() {
                 )
                 .apply()
 
-            statusText.text =
-                "API-ключ подключён"
-
             Toast.makeText(
                 this,
                 "API-ключ подключён",
                 Toast.LENGTH_SHORT
             ).show()
-        }
-    }
-
-    private fun updateApiKeyStatus() {
-
-        val uri =
-            getSharedPreferences(
-                PREFS_NAME,
-                MODE_PRIVATE
-            )
-                .getString(
-                    KEY_API_KEY_URI,
-                    null
-                )
-
-        if (uri != null) {
-
-            statusText.text =
-                "API-ключ подключён"
-
-        } else {
-
-            statusText.text =
-                "API-ключ не подключён"
         }
     }
 
@@ -363,7 +462,9 @@ class MainActivity : AppCompatActivity() {
 
         try {
 
-            startActivity(intent)
+            startActivity(
+                intent
+            )
 
         } catch (
             error: ActivityNotFoundException
