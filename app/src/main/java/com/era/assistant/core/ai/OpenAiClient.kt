@@ -18,6 +18,8 @@ class OpenAiClient {
             "gpt-5-mini"
     }
 
+    private var previousResponseId: String? = null
+
     fun sendMessage(
         context: Context,
         apiKeyUriString: String,
@@ -55,6 +57,15 @@ class OpenAiClient {
                             "input",
                             message
                         )
+
+                        previousResponseId?.let {
+                            responseId ->
+
+                            put(
+                                "previous_response_id",
+                                responseId
+                            )
+                        }
                     }
 
                 val connection =
@@ -130,9 +141,26 @@ class OpenAiClient {
                     return@Thread
                 }
 
+                val responseJson =
+                    JSONObject(
+                        responseText
+                    )
+
+                val newResponseId =
+                    responseJson.optString(
+                        "id"
+                    )
+
+                if (
+                    newResponseId.isNotBlank()
+                ) {
+                    previousResponseId =
+                        newResponseId
+                }
+
                 val answer =
                     extractText(
-                        responseText
+                        responseJson
                     )
 
                 if (answer.isBlank()) {
@@ -159,6 +187,10 @@ class OpenAiClient {
             }
 
         }.start()
+    }
+
+    fun resetConversation() {
+        previousResponseId = null
     }
 
     private fun readApiKey(
@@ -210,13 +242,8 @@ class OpenAiClient {
     }
 
     private fun extractText(
-        jsonText: String
+        root: JSONObject
     ): String {
-
-        val root =
-            JSONObject(
-                jsonText
-            )
 
         val output =
             root.optJSONArray(
