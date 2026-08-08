@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.era.assistant.core.ai.OpenAiClient
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,21 +24,52 @@ class MainActivity : AppCompatActivity() {
 
         private const val LOCK_TEST_REQUEST_CODE = 1001
         private const val CHATGPT_PACKAGE = "com.openai.chatgpt"
+
+        private const val REQUEST_OPEN_API_KEY = 2001
+        private const val KEY_API_KEY_URI = "api_key_uri"
     }
+
+    private lateinit var statusText: TextView
+    private lateinit var messageInput: EditText
+    private lateinit var responseText: TextView
+    private lateinit var sendApiButton: Button
+
+    private val openAiClient =
+        OpenAiClient()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
 
-        val statusText =
-            findViewById<TextView>(R.id.statusText)
+        statusText =
+            findViewById(R.id.statusText)
+
+        messageInput =
+            findViewById(R.id.messageInput)
+
+        responseText =
+            findViewById(R.id.responseText)
+
+        sendApiButton =
+            findViewById(R.id.sendApiButton)
+
+        val apiKeyButton =
+            findViewById<Button>(R.id.apiKeyButton)
 
         val voiceButton =
             findViewById<Button>(R.id.voiceButton)
 
         val lockTestButton =
             findViewById<Button>(R.id.lockTestButton)
+
+        apiKeyButton.setOnClickListener {
+            chooseApiKeyFile()
+        }
+
+        sendApiButton.setOnClickListener {
+            sendMessageToSphere()
+        }
 
         voiceButton.setOnClickListener {
 
@@ -78,6 +111,198 @@ class MainActivity : AppCompatActivity() {
                 "Есть 10 секунд. Заблокируй телефон.",
                 Toast.LENGTH_LONG
             ).show()
+        }
+
+        updateApiKeyStatus()
+    }
+
+    private fun sendMessageToSphere() {
+
+        val message =
+            messageInput
+                .text
+                .toString()
+                .trim()
+
+        if (message.isBlank()) {
+
+            Toast.makeText(
+                this,
+                "Сначала напиши сообщение",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val apiKeyUri =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+                .getString(
+                    KEY_API_KEY_URI,
+                    null
+                )
+
+        if (apiKeyUri == null) {
+
+            statusText.text =
+                "API-ключ не подключён"
+
+            Toast.makeText(
+                this,
+                "Сначала выбери файл API-ключа",
+                Toast.LENGTH_LONG
+            ).show()
+
+            return
+        }
+
+        sendApiButton.isEnabled =
+            false
+
+        statusText.text =
+            "Сфера думает..."
+
+        responseText.text =
+            "Ожидаю ответ..."
+
+        openAiClient.sendMessage(
+            context = this,
+            apiKeyUriString = apiKeyUri,
+            message = message,
+
+            onSuccess = { answer ->
+
+                runOnUiThread {
+
+                    sendApiButton.isEnabled =
+                        true
+
+                    statusText.text =
+                        "Ответ получен"
+
+                    responseText.text =
+                        answer
+                }
+            },
+
+            onError = { error ->
+
+                runOnUiThread {
+
+                    sendApiButton.isEnabled =
+                        true
+
+                    statusText.text =
+                        "Ошибка API"
+
+                    responseText.text =
+                        error
+                }
+            }
+        )
+    }
+
+    private fun chooseApiKeyFile() {
+
+        val intent =
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+
+                addCategory(
+                    Intent.CATEGORY_OPENABLE
+                )
+
+                type =
+                    "text/plain"
+
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                )
+            }
+
+        startActivityForResult(
+            intent,
+            REQUEST_OPEN_API_KEY
+        )
+    }
+
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?
+    ) {
+
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        )
+
+        if (
+            requestCode == REQUEST_OPEN_API_KEY &&
+            resultCode == RESULT_OK
+        ) {
+
+            val uri =
+                data?.data ?: return
+
+            try {
+
+                contentResolver
+                    .takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+
+            } catch (_: Exception) {
+            }
+
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+                .edit()
+                .putString(
+                    KEY_API_KEY_URI,
+                    uri.toString()
+                )
+                .apply()
+
+            statusText.text =
+                "API-ключ подключён"
+
+            Toast.makeText(
+                this,
+                "API-ключ подключён",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun updateApiKeyStatus() {
+
+        val uri =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+                .getString(
+                    KEY_API_KEY_URI,
+                    null
+                )
+
+        if (uri != null) {
+
+            statusText.text =
+                "API-ключ подключён"
+
+        } else {
+
+            statusText.text =
+                "API-ключ не подключён"
         }
     }
 
