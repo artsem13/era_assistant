@@ -102,16 +102,16 @@
             android:textColorHint="#777777"
             android:textSize="16sp" />
 
-        <Button
+        <ImageButton
             android:id="@+id/sendApiButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginLeft="10dp"
-            android:background="@drawable/bg_send_button"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_marginLeft="8dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="Отправить"
             android:padding="0dp"
-            android:text="" />
+            android:scaleType="fitCenter"
+            android:src="@drawable/earth_send" />
 
     </LinearLayout>
 

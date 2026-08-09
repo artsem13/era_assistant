@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ScrollView
@@ -89,7 +90,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var messageInput: EditText
     private lateinit var responseText: TextView
-    private lateinit var sendApiButton: Button
+    private lateinit var sendApiButton: ImageButton
     private lateinit var chatScrollView: ScrollView
 
     private val openAiClient =
@@ -117,9 +118,6 @@ class MainActivity : AppCompatActivity() {
 
         val menuButton =
             findViewById<Button>(R.id.menuButton)
-
-        sendApiButton.text =
-            "↑"
 
         sendApiButton.setOnClickListener {
             sendMessageToSphere()
@@ -563,9 +561,6 @@ class MainActivity : AppCompatActivity() {
         sendApiButton.isEnabled =
             false
 
-        sendApiButton.text =
-            "…"
-
         openAiClient.sendMessage(
             context = this,
             apiKeyUriString = apiKeyUri,
@@ -583,9 +578,6 @@ class MainActivity : AppCompatActivity() {
                     sendApiButton.isEnabled =
                         true
 
-                    sendApiButton.text =
-                        "↑"
-
                     appendSphereMessage(
                         response.text
                     )
@@ -598,9 +590,6 @@ class MainActivity : AppCompatActivity() {
 
                     sendApiButton.isEnabled =
                         true
-
-                    sendApiButton.text =
-                        "↑"
 
                     appendErrorMessage(
                         error
