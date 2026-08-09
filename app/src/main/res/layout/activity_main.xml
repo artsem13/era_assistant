@@ -4,54 +4,115 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:background="#000000"
     android:paddingLeft="12dp"
-    android:paddingTop="6dp"
-    android:paddingRight="12dp"
-    android:paddingBottom="8dp">
+    android:paddingTop="8dp"
+    android:paddingRight="12dp">
 
-    <Button
-        android:id="@+id/menuButton"
-        android:layout_width="56dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_gravity="end"
-        android:text="⋮"
-        android:textSize="24sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/menuButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_menu_button"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="☰"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="Эра"
+            android:textColor="#F5F5F5"
+            android:textSize="18sp" />
+
+        <View
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+
+    </LinearLayout>
 
     <ScrollView
         android:id="@+id/chatScrollView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:clipToPadding="false"
         android:fillViewport="true"
-        android:scrollbars="vertical">
+        android:overScrollMode="never"
+        android:paddingBottom="8dp"
+        android:scrollbars="none">
 
         <TextView
             android:id="@+id/responseText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="8dp"
+            android:paddingLeft="8dp"
+            android:paddingTop="12dp"
+            android:paddingRight="8dp"
+            android:paddingBottom="12dp"
             android:text="Начни разговор со Сферой."
+            android:textColor="#EAEAEA"
             android:textIsSelectable="true"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:lineSpacingExtra="3dp" />
 
     </ScrollView>
 
-    <EditText
-        android:id="@+id/messageInput"
+    <LinearLayout
+        android:id="@+id/inputPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:gravity="top|start"
-        android:hint="Напиши Сфере..."
-        android:inputType="textMultiLine"
-        android:maxLines="4"
-        android:minLines="2" />
+        android:background="#000000"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
-    <Button
-        android:id="@+id/sendApiButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Спросить Сферу" />
+        <EditText
+            android:id="@+id/messageInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_message_input"
+            android:gravity="center_vertical|start"
+            android:hint="Спросить Эру..."
+            android:inputType="textMultiLine|textCapSentences"
+            android:maxLines="4"
+            android:minHeight="52dp"
+            android:paddingLeft="18dp"
+            android:paddingTop="10dp"
+            android:paddingRight="18dp"
+            android:paddingBottom="10dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#777777"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/sendApiButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginLeft="10dp"
+            android:background="@drawable/bg_send_button"
+            android:minWidth="0dp"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:text="" />
+
+    </LinearLayout>
 
 </LinearLayout>

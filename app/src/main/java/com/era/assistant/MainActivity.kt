@@ -9,12 +9,16 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
+import com.era.assistant.core.ai.OpenAiResponse
+import com.era.assistant.core.ai.UsageCalculator
 
 class MainActivity : AppCompatActivity() {
 
@@ -25,11 +29,62 @@ class MainActivity : AppCompatActivity() {
 
         const val LOCK_TEST_DELAY_MS = 10_000L
 
+        const val KEY_SESSION_INPUT_TOKENS =
+            "session_input_tokens"
+
+        const val KEY_SESSION_OUTPUT_TOKENS =
+            "session_output_tokens"
+
+        const val KEY_SESSION_CACHED_TOKENS =
+            "session_cached_tokens"
+
+        const val KEY_SESSION_TOTAL_TOKENS =
+            "session_total_tokens"
+
+        const val KEY_SESSION_MODEL =
+            "session_model"
+
+        const val KEY_SESSION_COST =
+            "session_cost"
+
+        const val KEY_TOTAL_SPENT =
+            "total_spent"
+
+        const val KEY_LUNA_TOKENS =
+            "luna_tokens"
+
+        const val KEY_LUNA_COST =
+            "luna_cost"
+
+        const val KEY_TERRA_TOKENS =
+            "terra_tokens"
+
+        const val KEY_TERRA_COST =
+            "terra_cost"
+
+        const val KEY_SOL_TOKENS =
+            "sol_tokens"
+
+        const val KEY_SOL_COST =
+            "sol_cost"
+
+        const val KEY_MINI_TOKENS =
+            "mini_tokens"
+
+        const val KEY_MINI_COST =
+            "mini_cost"
+
         private const val LOCK_TEST_REQUEST_CODE = 1001
         private const val CHATGPT_PACKAGE = "com.openai.chatgpt"
 
         private const val REQUEST_OPEN_API_KEY = 2001
         private const val KEY_API_KEY_URI = "api_key_uri"
+
+        private const val KEY_SELECTED_MODEL =
+            "selected_model"
+
+        private const val KEY_SPHERE_INSTRUCTIONS =
+            "sphere_instructions"
     }
 
     private lateinit var messageInput: EditText
@@ -63,6 +118,9 @@ class MainActivity : AppCompatActivity() {
         val menuButton =
             findViewById<Button>(R.id.menuButton)
 
+        sendApiButton.text =
+            "↑"
+
         sendApiButton.setOnClickListener {
             sendMessageToSphere()
         }
@@ -73,6 +131,8 @@ class MainActivity : AppCompatActivity() {
 
         responseText.text =
             "Начни разговор со Сферой."
+
+        loadSelectedModel()
     }
 
     private fun showMainMenu(
@@ -84,6 +144,18 @@ class MainActivity : AppCompatActivity() {
                 this,
                 anchor
             )
+
+        popupMenu.menu.add(
+            "Инструкции"
+        )
+
+        popupMenu.menu.add(
+            "Модель: ${getCurrentModelName()}"
+        )
+
+        popupMenu.menu.add(
+            "Использование"
+        )
 
         popupMenu.menu.add(
             "Выбрать API-ключ"
@@ -98,23 +170,49 @@ class MainActivity : AppCompatActivity() {
         )
 
         popupMenu.setOnMenuItemClickListener {
-            item ->
+                item ->
 
-            when (
-                item.title.toString()
-            ) {
+            when {
 
-                "Выбрать API-ключ" -> {
+                item.title.toString() ==
+                    "Инструкции" -> {
+
+                    showInstructionsEditor()
+                    true
+                }
+
+                item.title
+                    .toString()
+                    .startsWith("Модель:") -> {
+
+                    showModelSelector()
+                    true
+                }
+
+                item.title.toString() ==
+                    "Использование" -> {
+
+                    openUsageScreen()
+                    true
+                }
+
+                item.title.toString() ==
+                    "Выбрать API-ключ" -> {
+
                     chooseApiKeyFile()
                     true
                 }
 
-                "Запустить ChatGPT" -> {
+                item.title.toString() ==
+                    "Запустить ChatGPT" -> {
+
                     startChatGptFromMenu()
                     true
                 }
 
-                "Тест блокировки — 10 сек" -> {
+                item.title.toString() ==
+                    "Тест блокировки — 10 сек" -> {
+
                     startLockTestFromMenu()
                     true
                 }
@@ -124,6 +222,293 @@ class MainActivity : AppCompatActivity() {
         }
 
         popupMenu.show()
+    }
+
+    private fun openUsageScreen() {
+
+        val intent =
+            Intent(
+                this,
+                UsageActivity::class.java
+            )
+
+        startActivity(
+            intent
+        )
+    }
+
+    private fun showInstructionsEditor() {
+
+        val savedInstructions =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+                .getString(
+                    KEY_SPHERE_INSTRUCTIONS,
+                    ""
+                )
+                ?: ""
+
+        val container =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                val padding =
+                    dpToPx(20)
+
+                setPadding(
+                    padding,
+                    dpToPx(8),
+                    padding,
+                    0
+                )
+            }
+
+        val instructionsInput =
+            EditText(this).apply {
+
+                hint =
+                    "Здесь будут инструкции Сферы..."
+
+                setText(
+                    savedInstructions
+                )
+
+                gravity =
+                    android.view.Gravity.TOP or
+                        android.view.Gravity.START
+
+                inputType =
+                    android.text.InputType.TYPE_CLASS_TEXT or
+                        android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                        android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+
+                minLines =
+                    10
+
+                maxLines =
+                    18
+
+                isVerticalScrollBarEnabled =
+                    true
+
+                setSelection(
+                    text.length
+                )
+            }
+
+        container.addView(
+            instructionsInput,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(320)
+            )
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("Инструкции Сферы")
+            .setView(
+                container
+            )
+            .setPositiveButton(
+                "Сохранить"
+            ) {
+                    _,
+                    _ ->
+
+                val instructions =
+                    instructionsInput
+                        .text
+                        .toString()
+                        .trim()
+
+                saveSphereInstructions(
+                    instructions
+                )
+
+                Toast.makeText(
+                    this,
+                    "Инструкции сохранены",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            .setNegativeButton(
+                "Отмена",
+                null
+            )
+            .show()
+    }
+
+    private fun saveSphereInstructions(
+        instructions: String
+    ) {
+
+        getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                KEY_SPHERE_INSTRUCTIONS,
+                instructions
+            )
+            .apply()
+    }
+
+    private fun loadSphereInstructions(): String {
+
+        return getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+            .getString(
+                KEY_SPHERE_INSTRUCTIONS,
+                ""
+            )
+            ?: ""
+    }
+
+    private fun dpToPx(
+        dp: Int
+    ): Int {
+
+        return (
+            dp *
+                resources
+                    .displayMetrics
+                    .density
+            ).toInt()
+    }
+
+    private fun showModelSelector() {
+
+        val modelNames =
+            arrayOf(
+                "Эконом — GPT-5 mini",
+                "Разговор — GPT-5.6 Luna",
+                "Глубокий — GPT-5.6 Terra",
+                "Максимум — GPT-5.6 Sol"
+            )
+
+        val modelIds =
+            arrayOf(
+                OpenAiClient.MODEL_ECONOMY,
+                OpenAiClient.MODEL_CONVERSATION,
+                OpenAiClient.MODEL_DEEP,
+                OpenAiClient.MODEL_MAXIMUM
+            )
+
+        var selectedIndex = 0
+
+        val currentModel =
+            openAiClient.getModel()
+
+        for (
+            index in modelIds.indices
+        ) {
+
+            if (
+                modelIds[index] ==
+                currentModel
+            ) {
+
+                selectedIndex =
+                    index
+
+                break
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Выбери модель")
+            .setSingleChoiceItems(
+                modelNames,
+                selectedIndex
+            ) {
+                    dialog,
+                    which ->
+
+                val selectedModel =
+                    modelIds[which]
+
+                openAiClient.setModel(
+                    selectedModel
+                )
+
+                saveSelectedModel(
+                    selectedModel
+                )
+
+                Toast.makeText(
+                    this,
+                    "Модель: ${modelNames[which]}",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                dialog.dismiss()
+            }
+            .setNegativeButton(
+                "Отмена",
+                null
+            )
+            .show()
+    }
+
+    private fun saveSelectedModel(
+        model: String
+    ) {
+
+        getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                KEY_SELECTED_MODEL,
+                model
+            )
+            .apply()
+    }
+
+    private fun loadSelectedModel() {
+
+        val model =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+                .getString(
+                    KEY_SELECTED_MODEL,
+                    OpenAiClient.MODEL_ECONOMY
+                )
+                ?: OpenAiClient.MODEL_ECONOMY
+
+        openAiClient.setModel(
+            model
+        )
+    }
+
+    private fun getCurrentModelName(): String {
+
+        return when (
+            openAiClient.getModel()
+        ) {
+
+            OpenAiClient.MODEL_CONVERSATION ->
+                "Разговор"
+
+            OpenAiClient.MODEL_DEEP ->
+                "Глубокий"
+
+            OpenAiClient.MODEL_MAXIMUM ->
+                "Максимум"
+
+            else ->
+                "Эконом"
+        }
     }
 
     private fun sendMessageToSphere() {
@@ -159,12 +544,15 @@ class MainActivity : AppCompatActivity() {
 
             Toast.makeText(
                 this,
-                "Сначала выбери API-ключ через меню ⋮",
+                "Сначала выбери API-ключ через меню",
                 Toast.LENGTH_LONG
             ).show()
 
             return
         }
+
+        val instructions =
+            loadSphereInstructions()
 
         appendUserMessage(
             message
@@ -176,14 +564,19 @@ class MainActivity : AppCompatActivity() {
             false
 
         sendApiButton.text =
-            "Сфера думает..."
+            "…"
 
         openAiClient.sendMessage(
             context = this,
             apiKeyUriString = apiKeyUri,
             message = message,
+            instructions = instructions,
 
-            onSuccess = { answer ->
+            onSuccess = { response ->
+
+                saveSessionUsage(
+                    response
+                )
 
                 runOnUiThread {
 
@@ -191,10 +584,10 @@ class MainActivity : AppCompatActivity() {
                         true
 
                     sendApiButton.text =
-                        "Спросить Сферу"
+                        "↑"
 
                     appendSphereMessage(
-                        answer
+                        response.text
                     )
                 }
             },
@@ -207,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                         true
 
                     sendApiButton.text =
-                        "Спросить Сферу"
+                        "↑"
 
                     appendErrorMessage(
                         error
@@ -221,6 +614,256 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         )
+    }
+
+    private fun saveSessionUsage(
+        response: OpenAiResponse
+    ) {
+
+        val prefs =
+            getSharedPreferences(
+                PREFS_NAME,
+                MODE_PRIVATE
+            )
+
+        val currentInput =
+            prefs.getInt(
+                KEY_SESSION_INPUT_TOKENS,
+                0
+            )
+
+        val currentOutput =
+            prefs.getInt(
+                KEY_SESSION_OUTPUT_TOKENS,
+                0
+            )
+
+        val currentCached =
+            prefs.getInt(
+                KEY_SESSION_CACHED_TOKENS,
+                0
+            )
+
+        val currentTotal =
+            prefs.getInt(
+                KEY_SESSION_TOTAL_TOKENS,
+                0
+            )
+
+        val usageCost =
+            UsageCalculator.calculate(
+                model =
+                    response.model,
+
+                inputTokens =
+                    response.inputTokens,
+
+                outputTokens =
+                    response.outputTokens,
+
+                cachedTokens =
+                    response.cachedTokens
+            )
+
+        val currentSessionCost =
+            prefs.getFloat(
+                KEY_SESSION_COST,
+                0f
+            )
+
+        val currentTotalSpent =
+            prefs.getFloat(
+                KEY_TOTAL_SPENT,
+                0f
+            )
+
+        val editor =
+            prefs.edit()
+
+        editor.putInt(
+            KEY_SESSION_INPUT_TOKENS,
+            currentInput +
+                response.inputTokens
+        )
+
+        editor.putInt(
+            KEY_SESSION_OUTPUT_TOKENS,
+            currentOutput +
+                response.outputTokens
+        )
+
+        editor.putInt(
+            KEY_SESSION_CACHED_TOKENS,
+            currentCached +
+                response.cachedTokens
+        )
+
+        editor.putInt(
+            KEY_SESSION_TOTAL_TOKENS,
+            currentTotal +
+                response.totalTokens
+        )
+
+        editor.putString(
+            KEY_SESSION_MODEL,
+            response.model
+        )
+
+        editor.putFloat(
+            KEY_SESSION_COST,
+            currentSessionCost +
+                usageCost.totalCost.toFloat()
+        )
+
+        editor.putFloat(
+            KEY_TOTAL_SPENT,
+            currentTotalSpent +
+                usageCost.totalCost.toFloat()
+        )
+
+        saveModelUsage(
+            response =
+                response,
+            cost =
+                usageCost.totalCost,
+            editor =
+                editor,
+            prefs =
+                prefs
+        )
+
+        editor.apply()
+    }
+
+    private fun saveModelUsage(
+        response: OpenAiResponse,
+        cost: Double,
+        editor: android.content.SharedPreferences.Editor,
+        prefs: android.content.SharedPreferences
+    ) {
+
+        when {
+
+            response.model.contains(
+                OpenAiClient.MODEL_CONVERSATION,
+                ignoreCase = true
+            ) -> {
+
+                val tokens =
+                    prefs.getInt(
+                        KEY_LUNA_TOKENS,
+                        0
+                    )
+
+                val savedCost =
+                    prefs.getFloat(
+                        KEY_LUNA_COST,
+                        0f
+                    )
+
+                editor.putInt(
+                    KEY_LUNA_TOKENS,
+                    tokens +
+                        response.totalTokens
+                )
+
+                editor.putFloat(
+                    KEY_LUNA_COST,
+                    savedCost +
+                        cost.toFloat()
+                )
+            }
+
+            response.model.contains(
+                OpenAiClient.MODEL_DEEP,
+                ignoreCase = true
+            ) -> {
+
+                val tokens =
+                    prefs.getInt(
+                        KEY_TERRA_TOKENS,
+                        0
+                    )
+
+                val savedCost =
+                    prefs.getFloat(
+                        KEY_TERRA_COST,
+                        0f
+                    )
+
+                editor.putInt(
+                    KEY_TERRA_TOKENS,
+                    tokens +
+                        response.totalTokens
+                )
+
+                editor.putFloat(
+                    KEY_TERRA_COST,
+                    savedCost +
+                        cost.toFloat()
+                )
+            }
+
+            response.model.contains(
+                OpenAiClient.MODEL_MAXIMUM,
+                ignoreCase = true
+            ) -> {
+
+                val tokens =
+                    prefs.getInt(
+                        KEY_SOL_TOKENS,
+                        0
+                    )
+
+                val savedCost =
+                    prefs.getFloat(
+                        KEY_SOL_COST,
+                        0f
+                    )
+
+                editor.putInt(
+                    KEY_SOL_TOKENS,
+                    tokens +
+                        response.totalTokens
+                )
+
+                editor.putFloat(
+                    KEY_SOL_COST,
+                    savedCost +
+                        cost.toFloat()
+                )
+            }
+
+            response.model.contains(
+                OpenAiClient.MODEL_ECONOMY,
+                ignoreCase = true
+            ) -> {
+
+                val tokens =
+                    prefs.getInt(
+                        KEY_MINI_TOKENS,
+                        0
+                    )
+
+                val savedCost =
+                    prefs.getFloat(
+                        KEY_MINI_COST,
+                        0f
+                    )
+
+                editor.putInt(
+                    KEY_MINI_TOKENS,
+                    tokens +
+                        response.totalTokens
+                )
+
+                editor.putFloat(
+                    KEY_MINI_COST,
+                    savedCost +
+                        cost.toFloat()
+                )
+            }
+        }
     }
 
     private fun appendUserMessage(

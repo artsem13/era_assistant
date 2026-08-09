@@ -8,23 +8,56 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 
+data class OpenAiResponse(
+    val text: String,
+    val model: String,
+    val inputTokens: Int,
+    val outputTokens: Int,
+    val cachedTokens: Int,
+    val totalTokens: Int
+)
+
 class OpenAiClient {
 
     companion object {
         private const val API_URL =
             "https://api.openai.com/v1/responses"
 
-        private const val MODEL =
+        const val MODEL_ECONOMY =
             "gpt-5-mini"
+
+        const val MODEL_CONVERSATION =
+            "gpt-5.6-luna"
+
+        const val MODEL_DEEP =
+            "gpt-5.6-terra"
+
+        const val MODEL_MAXIMUM =
+            "gpt-5.6-sol"
     }
 
     private var previousResponseId: String? = null
+
+    private var currentModel =
+        MODEL_ECONOMY
+
+    fun setModel(
+        model: String
+    ) {
+        currentModel =
+            model
+    }
+
+    fun getModel(): String {
+        return currentModel
+    }
 
     fun sendMessage(
         context: Context,
         apiKeyUriString: String,
         message: String,
-        onSuccess: (String) -> Unit,
+        instructions: String,
+        onSuccess: (OpenAiResponse) -> Unit,
         onError: (String) -> Unit
     ) {
 
@@ -39,9 +72,11 @@ class OpenAiClient {
                     )
 
                 if (apiKey.isBlank()) {
+
                     onError(
                         "Файл API-ключа пустой"
                     )
+
                     return@Thread
                 }
 
@@ -50,13 +85,23 @@ class OpenAiClient {
 
                         put(
                             "model",
-                            MODEL
+                            currentModel
                         )
 
                         put(
                             "input",
                             message
                         )
+
+                        if (
+                            instructions.isNotBlank()
+                        ) {
+
+                            put(
+                                "instructions",
+                                instructions
+                            )
+                        }
 
                         previousResponseId?.let {
                             responseId ->
@@ -116,15 +161,13 @@ class OpenAiClient {
                     ) {
 
                         readStream(
-                            connection
-                                .inputStream
+                            connection.inputStream
                         )
 
                     } else {
 
                         readStream(
-                            connection
-                                .errorStream
+                            connection.errorStream
                         )
                     }
 
@@ -154,6 +197,7 @@ class OpenAiClient {
                 if (
                     newResponseId.isNotBlank()
                 ) {
+
                     previousResponseId =
                         newResponseId
                 }
@@ -169,12 +213,83 @@ class OpenAiClient {
                         "Ответ получен, но текст модели не найден"
                     )
 
-                } else {
-
-                    onSuccess(
-                        answer
-                    )
+                    return@Thread
                 }
+
+                val usage =
+                    responseJson.optJSONObject(
+                        "usage"
+                    )
+
+                val inputTokens =
+                    usage?.optInt(
+                        "input_tokens",
+                        0
+                    ) ?: 0
+
+                val outputTokens =
+                    usage?.optInt(
+                        "output_tokens",
+                        0
+                    ) ?: 0
+
+                val totalTokens =
+                    usage?.optInt(
+                        "total_tokens",
+                        inputTokens + outputTokens
+                    )
+                        ?: (
+                            inputTokens +
+                                outputTokens
+                            )
+
+                val inputDetails =
+                    usage?.optJSONObject(
+                        "input_tokens_details"
+                    )
+
+                val cachedTokens =
+                    inputDetails?.optInt(
+                        "cached_tokens",
+                        0
+                    ) ?: 0
+
+                val actualModel =
+                    responseJson.optString(
+                        "model",
+                        currentModel
+                    )
+
+                val result =
+                    OpenAiResponse(
+                        text =
+                            answer,
+
+                        model =
+                            if (
+                                actualModel.isNotBlank()
+                            ) {
+                                actualModel
+                            } else {
+                                currentModel
+                            },
+
+                        inputTokens =
+                            inputTokens,
+
+                        outputTokens =
+                            outputTokens,
+
+                        cachedTokens =
+                            cachedTokens,
+
+                        totalTokens =
+                            totalTokens
+                    )
+
+                onSuccess(
+                    result
+                )
 
             } catch (
                 error: Exception
