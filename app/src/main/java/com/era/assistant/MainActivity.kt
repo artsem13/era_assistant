@@ -10,8 +10,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
@@ -389,12 +391,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    /*
-     * Сообщение пользователя.
-     *
-     * Графитовая плашка,
-     * скругление и никакого "Ты:".
-     */
     private fun appendUserMessage(
         message: String
     ) {
@@ -430,10 +426,6 @@ class MainActivity : AppCompatActivity() {
             true
         )
 
-        /*
-         * Плашка примерно в стиле ChatGPT,
-         * но остаётся слева.
-         */
         val bubble =
             GradientDrawable()
 
@@ -452,13 +444,6 @@ class MainActivity : AppCompatActivity() {
         textView.background =
             bubble
 
-        /*
-         * Не даём короткому сообщению
-         * растягиваться на весь экран.
-         *
-         * Длинное сообщение при этом
-         * может занять почти всю ширину.
-         */
         textView.maxWidth =
             resources
                 .displayMetrics
@@ -488,12 +473,6 @@ class MainActivity : AppCompatActivity() {
         scrollChatToBottom()
     }
 
-    /*
-     * Ответ Сферы.
-     *
-     * Просто текст на чёрном фоне.
-     * Никакого "Сфера:".
-     */
     private fun appendSphereMessage(
         message: String
     ) {
@@ -800,29 +779,55 @@ class MainActivity : AppCompatActivity() {
                 )
                 ?: ""
 
-        val container =
-            LinearLayout(
-                this
-            ).apply {
+        val root =
+            LinearLayout(this).apply {
 
                 orientation =
                     LinearLayout.VERTICAL
 
-                val padding =
-                    dpToPx(20)
+                setPadding(
+                    dpToPx(22),
+                    dpToPx(20),
+                    dpToPx(22),
+                    dpToPx(16)
+                )
+
+                background =
+                    createRoundedBackground(
+                        "#121722",
+                        24
+                    )
+            }
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Инструкции Сферы"
+
+                setTextColor(
+                    Color.parseColor(
+                        "#F1F1F4"
+                    )
+                )
+
+                textSize =
+                    20f
 
                 setPadding(
-                    padding,
-                    dpToPx(8),
-                    padding,
-                    0
+                    0,
+                    0,
+                    0,
+                    dpToPx(16)
                 )
             }
 
+        root.addView(
+            title
+        )
+
         val instructionsInput =
-            EditText(
-                this
-            ).apply {
+            EditText(this).apply {
 
                 hint =
                     "Здесь будут инструкции Сферы..."
@@ -831,9 +836,24 @@ class MainActivity : AppCompatActivity() {
                     savedInstructions
                 )
 
+                setTextColor(
+                    Color.parseColor(
+                        "#F1F1F4"
+                    )
+                )
+
+                setHintTextColor(
+                    Color.parseColor(
+                        "#737B8A"
+                    )
+                )
+
+                textSize =
+                    16f
+
                 gravity =
-                    android.view.Gravity.TOP or
-                        android.view.Gravity.START
+                    Gravity.TOP or
+                        Gravity.START
 
                 inputType =
                     android.text.InputType.TYPE_CLASS_TEXT or
@@ -849,12 +869,25 @@ class MainActivity : AppCompatActivity() {
                 isVerticalScrollBarEnabled =
                     true
 
+                setPadding(
+                    dpToPx(16),
+                    dpToPx(14),
+                    dpToPx(16),
+                    dpToPx(14)
+                )
+
+                background =
+                    createRoundedBackground(
+                        "#1A1F2A",
+                        16
+                    )
+
                 setSelection(
                     text.length
                 )
             }
 
-        container.addView(
+        root.addView(
             instructionsInput,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -862,42 +895,134 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        AlertDialog.Builder(
-            this
-        )
-            .setTitle(
-                "Инструкции Сферы"
-            )
-            .setView(
-                container
-            )
-            .setPositiveButton(
-                "Сохранить"
-            ) {
-                    _,
-                    _ ->
+        val buttons =
+            LinearLayout(this).apply {
 
-                val instructions =
-                    instructionsInput
-                        .text
-                        .toString()
-                        .trim()
+                orientation =
+                    LinearLayout.HORIZONTAL
 
-                saveSphereInstructions(
-                    instructions
+                gravity =
+                    Gravity.END or
+                        Gravity.CENTER_VERTICAL
+
+                setPadding(
+                    0,
+                    dpToPx(14),
+                    0,
+                    0
+                )
+            }
+
+        val cancelButton =
+            TextView(this).apply {
+
+                text =
+                    "Отмена"
+
+                setTextColor(
+                    Color.parseColor(
+                        "#9AA1AE"
+                    )
                 )
 
-                Toast.makeText(
-                    this,
-                    "Инструкции сохранены",
-                    Toast.LENGTH_SHORT
-                ).show()
+                textSize =
+                    15f
+
+                gravity =
+                    Gravity.CENTER
+
+                setPadding(
+                    dpToPx(16),
+                    dpToPx(10),
+                    dpToPx(16),
+                    dpToPx(10)
+                )
             }
-            .setNegativeButton(
-                "Отмена",
-                null
+
+        val saveButton =
+            TextView(this).apply {
+
+                text =
+                    "Сохранить"
+
+                setTextColor(
+                    Color.parseColor(
+                        "#F1F1F4"
+                    )
+                )
+
+                textSize =
+                    15f
+
+                gravity =
+                    Gravity.CENTER
+
+                setPadding(
+                    dpToPx(18),
+                    dpToPx(10),
+                    dpToPx(18),
+                    dpToPx(10)
+                )
+
+                background =
+                    createRoundedBackground(
+                        "#242B38",
+                        14
+                    )
+            }
+
+        buttons.addView(
+            cancelButton
+        )
+
+        buttons.addView(
+            saveButton
+        )
+
+        root.addView(
+            buttons
+        )
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setView(root)
+                .create()
+
+        cancelButton.setOnClickListener {
+
+            dialog.dismiss()
+        }
+
+        saveButton.setOnClickListener {
+
+            val instructions =
+                instructionsInput
+                    .text
+                    .toString()
+                    .trim()
+
+            saveSphereInstructions(
+                instructions
             )
-            .show()
+
+            Toast.makeText(
+                this,
+                "Инструкции сохранены",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            dialog.dismiss()
+        }
+
+        dialog.setOnShowListener {
+
+            dialog.window
+                ?.setBackgroundDrawableResource(
+                    android.R.color.transparent
+                )
+        }
+
+        dialog.show()
     }
 
     private fun saveSphereInstructions(
@@ -941,6 +1066,29 @@ class MainActivity : AppCompatActivity() {
             ).toInt()
     }
 
+    private fun createRoundedBackground(
+        color: String,
+        radiusDp: Int
+    ): GradientDrawable {
+
+        val drawable =
+            GradientDrawable()
+
+        drawable.shape =
+            GradientDrawable.RECTANGLE
+
+        drawable.setColor(
+            Color.parseColor(
+                color
+            )
+        )
+
+        drawable.cornerRadius =
+            dpToPx(radiusDp).toFloat()
+
+        return drawable
+    }
+
     private fun showModelSelector() {
 
         val modelNames =
@@ -951,6 +1099,22 @@ class MainActivity : AppCompatActivity() {
                 "Максимум — GPT-5.6 Sol"
             )
 
+        val modelShortNames =
+            arrayOf(
+                "Mini",
+                "Luna",
+                "Terra",
+                "Sol"
+            )
+
+        val modelColors =
+            arrayOf(
+                "#58A6E7",
+                "#C58AF9",
+                "#62D98B",
+                "#F2A45F"
+            )
+
         val modelIds =
             arrayOf(
                 OpenAiClient.MODEL_ECONOMY,
@@ -959,43 +1123,191 @@ class MainActivity : AppCompatActivity() {
                 OpenAiClient.MODEL_MAXIMUM
             )
 
-        var selectedIndex =
-            0
+        val root =
+            LinearLayout(this).apply {
+
+                orientation =
+                    LinearLayout.VERTICAL
+
+                setPadding(
+                    dpToPx(22),
+                    dpToPx(20),
+                    dpToPx(22),
+                    dpToPx(16)
+                )
+
+                background =
+                    createRoundedBackground(
+                        "#121722",
+                        24
+                    )
+            }
+
+        val title =
+            TextView(this).apply {
+
+                text =
+                    "Выбери модель"
+
+                setTextColor(
+                    Color.parseColor(
+                        "#F1F1F4"
+                    )
+                )
+
+                textSize =
+                    20f
+
+                setPadding(
+                    0,
+                    0,
+                    0,
+                    dpToPx(10)
+                )
+            }
+
+        root.addView(
+            title
+        )
+
+        val dialog =
+            AlertDialog.Builder(this)
+                .setView(root)
+                .create()
 
         val currentModel =
             openAiClient.getModel()
 
-        for (
-            index in modelIds.indices
-        ) {
+        for (index in modelIds.indices) {
 
-            if (
-                modelIds[index] ==
-                currentModel
-            ) {
+            val row =
+                LinearLayout(this).apply {
 
-                selectedIndex =
-                    index
+                    orientation =
+                        LinearLayout.HORIZONTAL
 
-                break
-            }
-        }
+                    gravity =
+                        Gravity.CENTER_VERTICAL
 
-        AlertDialog.Builder(
-            this
-        )
-            .setTitle(
-                "Выбери модель"
+                    setPadding(
+                        dpToPx(4),
+                        dpToPx(4),
+                        dpToPx(4),
+                        dpToPx(4)
+                    )
+                }
+
+            val indicator =
+                TextView(this).apply {
+
+                    text =
+                        if (
+                            modelIds[index] ==
+                            currentModel
+                        ) {
+                            "●"
+                        } else {
+                            "○"
+                        }
+
+                    setTextColor(
+                        Color.parseColor(
+                            modelColors[index]
+                        )
+                    )
+
+                    textSize =
+                        22f
+
+                    gravity =
+                        Gravity.CENTER
+                }
+
+            row.addView(
+                indicator,
+                LinearLayout.LayoutParams(
+                    dpToPx(42),
+                    dpToPx(56)
+                )
             )
-            .setSingleChoiceItems(
-                modelNames,
-                selectedIndex
-            ) {
-                    dialog,
-                    which ->
+
+            val texts =
+                LinearLayout(this).apply {
+
+                    orientation =
+                        LinearLayout.VERTICAL
+
+                    gravity =
+                        Gravity.CENTER_VERTICAL
+
+                    setPadding(
+                        dpToPx(8),
+                        0,
+                        0,
+                        0
+                    )
+                }
+
+            val mainText =
+                TextView(this).apply {
+
+                    text =
+                        modelNames[index]
+
+                    setTextColor(
+                        Color.parseColor(
+                            "#F1F1F4"
+                        )
+                    )
+
+                    textSize =
+                        16f
+                }
+
+            val accentText =
+                TextView(this).apply {
+
+                    text =
+                        modelShortNames[index]
+
+                    setTextColor(
+                        Color.parseColor(
+                            modelColors[index]
+                        )
+                    )
+
+                    textSize =
+                        13f
+
+                    setPadding(
+                        0,
+                        dpToPx(2),
+                        0,
+                        0
+                    )
+                }
+
+            texts.addView(
+                mainText
+            )
+
+            texts.addView(
+                accentText
+            )
+
+            row.addView(
+                texts,
+                LinearLayout.LayoutParams(
+                    0,
+                    dpToPx(64),
+                    1f
+                )
+            )
+
+            row.setOnClickListener {
 
                 val selectedModel =
-                    modelIds[which]
+                    modelIds[index]
 
                 openAiClient.setModel(
                     selectedModel
@@ -1009,17 +1321,109 @@ class MainActivity : AppCompatActivity() {
 
                 Toast.makeText(
                     this,
-                    "Модель: ${modelNames[which]}",
+                    "Модель: ${modelNames[index]}",
                     Toast.LENGTH_SHORT
                 ).show()
 
                 dialog.dismiss()
             }
-            .setNegativeButton(
-                "Отмена",
-                null
+
+            root.addView(
+                row,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(64)
+                )
             )
-            .show()
+
+            if (
+                index <
+                modelIds.size - 1
+            ) {
+
+                val divider =
+                    View(this)
+
+                divider.setBackgroundColor(
+                    Color.parseColor(
+                        "#252C37"
+                    )
+                )
+
+                val dividerParams =
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dpToPx(1)
+                    )
+
+                dividerParams.setMargins(
+                    dpToPx(8),
+                    0,
+                    dpToPx(8),
+                    0
+                )
+
+                root.addView(
+                    divider,
+                    dividerParams
+                )
+            }
+        }
+
+        val cancelButton =
+            TextView(this).apply {
+
+                text =
+                    "Отмена"
+
+                setTextColor(
+                    Color.parseColor(
+                        "#9AA1AE"
+                    )
+                )
+
+                textSize =
+                    15f
+
+                gravity =
+                    Gravity.CENTER
+
+                setPadding(
+                    dpToPx(18),
+                    dpToPx(12),
+                    dpToPx(18),
+                    dpToPx(8)
+                )
+            }
+
+        val cancelParams =
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        cancelParams.gravity =
+            Gravity.END
+
+        root.addView(
+            cancelButton,
+            cancelParams
+        )
+
+        cancelButton.setOnClickListener {
+
+            dialog.dismiss()
+        }
+
+        dialog.setOnShowListener {
+
+            dialog.window
+                ?.setBackgroundDrawableResource(
+                    android.R.color.transparent
+                )
+        }
+
+        dialog.show()
     }
 
     private fun saveSelectedModel(
