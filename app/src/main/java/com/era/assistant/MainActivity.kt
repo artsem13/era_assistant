@@ -13,7 +13,6 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
@@ -27,6 +26,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
 import com.era.assistant.core.ai.OpenAiResponse
 import com.era.assistant.core.ai.UsageCalculator
+import com.era.assistant.core.memory.RawBlockCoordinator
 
 class MainActivity : AppCompatActivity() {
 
@@ -116,6 +116,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sideMenu: LinearLayout
     private lateinit var menuScrim: View
     private lateinit var menuModel: TextView
+
+    private lateinit var conversationArchive: ConversationArchive
+    private lateinit var conversationSessionManager: ConversationSessionManager
+    private lateinit var conversationRestoreController: ConversationRestoreController
+
+    private lateinit var researchNotesStore: ResearchNotesStore
+    private lateinit var researchNoteController: ResearchNoteController
+
+    private lateinit var rawBlockCoordinator: RawBlockCoordinator
+
+    private lateinit var conversationId: String
+
+    @Volatile
+    private var lastMessageId: Long? =
+        null
 
     private var menuIsOpen =
         false
@@ -215,6 +230,49 @@ class MainActivity : AppCompatActivity() {
             R.layout.activity_main
         )
 
+        conversationArchive =
+            ConversationArchive(this)
+
+        conversationSessionManager =
+            ConversationSessionManager(this)
+
+        conversationRestoreController =
+            ConversationRestoreController(
+                archive = conversationArchive,
+                sessionManager = conversationSessionManager
+            )
+
+        rawBlockCoordinator =
+            RawBlockCoordinator(
+                context = this,
+                archive = conversationArchive
+            )
+
+        conversationId =
+            conversationRestoreController
+                .getCurrentConversationId()
+
+        lastMessageId =
+            conversationRestoreController
+                .getLastMessageId()
+
+        researchNotesStore =
+            ResearchNotesStore(
+                conversationArchive
+            )
+
+        researchNoteController =
+            ResearchNoteController(
+                activity = this,
+                notesStore = researchNotesStore,
+                conversationIdProvider = {
+                    conversationId
+                },
+                messageIdProvider = {
+                    lastMessageId
+                }
+            )
+
         messageInput =
             findViewById(
                 R.id.messageInput
@@ -253,6 +311,11 @@ class MainActivity : AppCompatActivity() {
         val menuButton =
             findViewById<Button>(
                 R.id.menuButton
+            )
+
+        val noteButton =
+            findViewById<ImageButton>(
+                R.id.noteButton
             )
 
         val menuInstructions =
@@ -335,6 +398,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        noteButton.setOnClickListener {
+
+            researchNoteController
+                .openNote()
+        }
+
         menuScrim.setOnClickListener {
 
             closeSideMenu()
@@ -386,9 +455,56 @@ class MainActivity : AppCompatActivity() {
 
         updateMenuModelText()
 
-        appendSphereMessage(
-            "Начни разговор со Сферой."
-        )
+        restoreCurrentConversation()
+    }
+
+    private fun restoreCurrentConversation() {
+
+        val messages =
+            conversationRestoreController
+                .loadCurrentConversation()
+
+        if (
+            messages.isEmpty()
+        ) {
+
+            appendSphereMessage(
+                "Начни разговор со Сферой."
+            )
+
+            return
+        }
+
+        for (
+            message in messages
+        ) {
+
+            when (
+                message.role
+            ) {
+
+                "user" -> {
+
+                    appendUserMessage(
+                        message.text
+                    )
+                }
+
+                "assistant" -> {
+
+                    appendSphereMessage(
+                        message.text
+                    )
+                }
+            }
+        }
+
+        lastMessageId =
+            messages
+                .lastOrNull()
+                ?.id
+
+        scrollChatToBottom()
     }
 
     private fun appendUserMessage(
@@ -1534,6 +1650,21 @@ class MainActivity : AppCompatActivity() {
         val instructions =
             loadSphereInstructions()
 
+        val userMessageId =
+            conversationArchive.saveUserMessage(
+                conversationId = conversationId,
+                text = message,
+                source = "text"
+            )
+
+        if (
+            userMessageId != -1L
+        ) {
+
+            lastMessageId =
+                userMessageId
+        }
+
         appendUserMessage(
             message
         )
@@ -1551,6 +1682,27 @@ class MainActivity : AppCompatActivity() {
             instructions = instructions,
 
             onSuccess = { response ->
+
+                val assistantMessageId =
+                    conversationArchive
+                        .saveAssistantMessage(
+                            conversationId = conversationId,
+                            text = response.text,
+                            model = response.model
+                        )
+
+                if (
+                    assistantMessageId != -1L
+                ) {
+
+                    lastMessageId =
+                        assistantMessageId
+
+                    rawBlockCoordinator
+                        .onAssistantMessageSaved(
+                            conversationId
+                        )
+                }
 
                 saveSessionUsage(
                     response
@@ -2105,6 +2257,13 @@ class MainActivity : AppCompatActivity() {
             .removeCallbacksAndMessages(
                 null
             )
+
+        if (
+            ::conversationArchive.isInitialized
+        ) {
+
+            conversationArchive.close()
+        }
 
         super.onDestroy()
     }

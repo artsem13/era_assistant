@@ -18,6 +18,8 @@
         android:paddingTop="8dp"
         android:paddingRight="12dp">
 
+        <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -48,11 +50,23 @@
                 android:textColor="#F5F5F5"
                 android:textSize="18sp" />
 
-            <View
+            <ImageButton
+                android:id="@+id/noteButton"
                 android:layout_width="48dp"
-                android:layout_height="48dp" />
+                android:layout_height="48dp"
+                android:background="@drawable/bg_menu_button"
+                android:contentDescription="Заметка"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_note_pen"
+                android:tint="#FFFFFF" />
 
         </LinearLayout>
+
+
+        <!-- ЧАТ -->
 
         <ScrollView
             android:id="@+id/chatScrollView"
@@ -77,6 +91,9 @@
                 android:paddingBottom="12dp" />
 
         </ScrollView>
+
+
+        <!-- ПОЛЕ ВВОДА -->
 
         <LinearLayout
             android:id="@+id/inputPanel"
