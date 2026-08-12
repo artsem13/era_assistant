@@ -26,6 +26,8 @@ import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
 import com.era.assistant.core.ai.OpenAiResponse
 import com.era.assistant.core.ai.UsageCalculator
+import com.era.assistant.core.memory.MemoryItemStore
+import com.era.assistant.core.memory.MemoryTopicRouter
 import com.era.assistant.core.memory.RawBlockCoordinator
 
 class MainActivity : AppCompatActivity() {
@@ -125,6 +127,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var researchNoteController: ResearchNoteController
 
     private lateinit var rawBlockCoordinator: RawBlockCoordinator
+
+    private lateinit var memoryItemStore: MemoryItemStore
+    private lateinit var memoryTopicRouter: MemoryTopicRouter
 
     private lateinit var conversationId: String
 
@@ -241,6 +246,14 @@ class MainActivity : AppCompatActivity() {
                 archive = conversationArchive,
                 sessionManager = conversationSessionManager
             )
+
+        memoryItemStore =
+            MemoryItemStore(
+                conversationArchive
+            )
+
+        memoryTopicRouter =
+            MemoryTopicRouter()
 
         rawBlockCoordinator =
             RawBlockCoordinator(
@@ -1294,7 +1307,9 @@ class MainActivity : AppCompatActivity() {
         val currentModel =
             openAiClient.getModel()
 
-        for (index in modelIds.indices) {
+        for (
+            index in modelIds.indices
+        ) {
 
             val row =
                 LinearLayout(this).apply {
@@ -1598,7 +1613,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendMessageToSphere() {
 
-        if (isSendingMessage) {
+        if (
+            isSendingMessage
+        ) {
             return
         }
 
@@ -1608,7 +1625,9 @@ class MainActivity : AppCompatActivity() {
                 .toString()
                 .trim()
 
-        if (message.isBlank()) {
+        if (
+            message.isBlank()
+        ) {
 
             Toast.makeText(
                 this,
@@ -1631,7 +1650,9 @@ class MainActivity : AppCompatActivity() {
                     null
                 )
 
-        if (apiKeyUri == null) {
+        if (
+            apiKeyUri == null
+        ) {
 
             Toast.makeText(
                 this,
@@ -1647,18 +1668,23 @@ class MainActivity : AppCompatActivity() {
         isSendingMessage =
             true
 
-        val instructions =
+        val baseInstructions =
             loadSphereInstructions()
 
         val userMessageId =
-            conversationArchive.saveUserMessage(
-                conversationId = conversationId,
-                text = message,
-                source = "text"
-            )
+            conversationArchive
+                .saveUserMessage(
+                    conversationId =
+                        conversationId,
+                    text =
+                        message,
+                    source =
+                        "text"
+                )
 
         if (
-            userMessageId != -1L
+            userMessageId !=
+                -1L
         ) {
 
             lastMessageId =
@@ -1669,30 +1695,132 @@ class MainActivity : AppCompatActivity() {
             message
         )
 
-        messageInput.text.clear()
+        messageInput
+            .text
+            .clear()
 
         keepInputActive()
 
         startMoonPulse()
 
+        val topics =
+            memoryItemStore
+                .getTopics()
+
+        if (
+            topics.isEmpty()
+        ) {
+
+            sendMessageWithMemoryContext(
+                apiKeyUri =
+                    apiKeyUri,
+                message =
+                    message,
+                baseInstructions =
+                    baseInstructions,
+                memoryContext =
+                    ""
+            )
+
+            return
+        }
+
+        memoryTopicRouter.route(
+            context =
+                this,
+            apiKeyUriString =
+                apiKeyUri,
+            userMessage =
+                message,
+            topics =
+                topics,
+
+            onSuccess = { selectedTopics ->
+
+                val memoryContext =
+                    try {
+
+                        memoryItemStore
+                            .buildTopicContext(
+                                selectedTopics
+                            )
+
+                    } catch (
+                        _: Exception
+                    ) {
+
+                        ""
+                    }
+
+                sendMessageWithMemoryContext(
+                    apiKeyUri =
+                        apiKeyUri,
+                    message =
+                        message,
+                    baseInstructions =
+                        baseInstructions,
+                    memoryContext =
+                        memoryContext
+                )
+            },
+
+            onError = {
+
+                sendMessageWithMemoryContext(
+                    apiKeyUri =
+                        apiKeyUri,
+                    message =
+                        message,
+                    baseInstructions =
+                        baseInstructions,
+                    memoryContext =
+                        ""
+                )
+            }
+        )
+    }
+
+    private fun sendMessageWithMemoryContext(
+        apiKeyUri: String,
+        message: String,
+        baseInstructions: String,
+        memoryContext: String
+    ) {
+
+        val finalInstructions =
+            buildSphereInstructionsWithMemory(
+                baseInstructions =
+                    baseInstructions,
+                memoryContext =
+                    memoryContext
+            )
+
         openAiClient.sendMessage(
-            context = this,
-            apiKeyUriString = apiKeyUri,
-            message = message,
-            instructions = instructions,
+            context =
+                this,
+            apiKeyUriString =
+                apiKeyUri,
+            message =
+                message,
+            instructions =
+                finalInstructions,
 
             onSuccess = { response ->
 
                 val assistantMessageId =
                     conversationArchive
                         .saveAssistantMessage(
-                            conversationId = conversationId,
-                            text = response.text,
-                            model = response.model
+                            conversationId =
+                                conversationId,
+                            text =
+                                response.text,
+                            model =
+                                response.model
                         )
 
                 if (
-                    assistantMessageId != -1L
+                    assistantMessageId !=
+                        -1L
                 ) {
 
                     lastMessageId =
@@ -1746,6 +1874,68 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         )
+    }
+
+    private fun buildSphereInstructionsWithMemory(
+        baseInstructions: String,
+        memoryContext: String
+    ): String {
+
+        if (
+            memoryContext.isBlank()
+        ) {
+
+            return baseInstructions
+        }
+
+        val result =
+            StringBuilder()
+
+        if (
+            baseInstructions.isNotBlank()
+        ) {
+
+            result.append(
+                baseInstructions.trim()
+            )
+
+            result.append(
+                "\n\n"
+            )
+        }
+
+        result.append(
+            """
+            Ниже передан релевантный фрагмент
+            долгосрочной памяти Эры.
+
+            Используй его только как дополнительный
+            контекст для текущего ответа.
+
+            Не упоминай сам механизм памяти,
+            смысловые блоки или процесс поиска,
+            если пользователь об этом прямо не спрашивает.
+
+            Не считай память более достоверной,
+            чем прямое новое сообщение пользователя.
+            Если текущее сообщение явно противоречит
+            старой памяти, приоритет имеет
+            более новая информация пользователя.
+
+            """.trimIndent()
+        )
+
+        result.append(
+            "\n\n"
+        )
+
+        result.append(
+            memoryContext
+        )
+
+        return result
+            .toString()
+            .trim()
     }
 
     private fun saveSessionUsage(
@@ -2144,7 +2334,9 @@ class MainActivity : AppCompatActivity() {
                     CHATGPT_PACKAGE
                 )
 
-        if (intent == null) {
+        if (
+            intent == null
+        ) {
 
             Toast.makeText(
                 this,
@@ -2203,7 +2395,9 @@ class MainActivity : AppCompatActivity() {
                 )
             )
 
-        } catch (_: Exception) {
+        } catch (
+            _: Exception
+        ) {
 
             Toast.makeText(
                 this,
@@ -2238,7 +2432,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onBackPressed() {
 
-        if (menuIsOpen) {
+        if (
+            menuIsOpen
+        ) {
 
             closeSideMenu()
 

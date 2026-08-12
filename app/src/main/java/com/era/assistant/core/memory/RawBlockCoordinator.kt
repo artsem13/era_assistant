@@ -34,6 +34,11 @@ class RawBlockCoordinator(
             archive
         )
 
+    private val memoryItemStore =
+        MemoryItemStore(
+            archive
+        )
+
     fun onAssistantMessageSaved(
         conversationId: String
     ) {
@@ -103,6 +108,10 @@ class RawBlockCoordinator(
                 return@Thread
             }
 
+            val existingTopics =
+                memoryItemStore
+                    .getTopics()
+
             val runId =
                 memoryCompilerRunStore
                     .createRun(
@@ -130,16 +139,34 @@ class RawBlockCoordinator(
                 context = context,
                 apiKeyUriString = apiKeyUri,
                 rawBlockText = rawBlockText,
+                existingTopics = existingTopics,
 
-                onSuccess = { summary ->
+                onSuccess = { compilerOutput ->
 
                     memoryCompilerRunStore
                         .markSuccess(
                             runId =
                                 runId,
                             summary =
-                                summary
+                                compilerOutput
                         )
+
+                    try {
+
+                        memoryItemStore
+                            .saveCompilerOutput(
+                                compilerOutput =
+                                    compilerOutput,
+                                rawBlockId =
+                                    blockId,
+                                compilerRunId =
+                                    runId
+                            )
+
+                    } catch (
+                        _: Exception
+                    ) {
+                    }
 
                     LocalMemoryBackup
                         .backupInBackground(

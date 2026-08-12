@@ -11,7 +11,7 @@ class RawBlockManager(
     companion object {
 
         const val RAW_BLOCK_TARGET_TOKENS =
-            500
+            4000
 
         private const val TABLE_RAW_BLOCKS =
             "raw_blocks"
