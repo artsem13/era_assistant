@@ -25,6 +25,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
 import com.era.assistant.core.ai.OpenAiResponse
+import com.era.assistant.core.ai.OpenAiStreamingClient
+import com.era.assistant.core.ai.StreamingResponseController
 import com.era.assistant.core.ai.UsageCalculator
 import com.era.assistant.core.memory.MemoryItemStore
 import com.era.assistant.core.memory.MemoryTopicRouter
@@ -142,6 +144,11 @@ class MainActivity : AppCompatActivity() {
 
     private val openAiClient =
         OpenAiClient()
+
+    private val streamingResponseController =
+        StreamingResponseController(
+            OpenAiStreamingClient()
+        )
 
     private val moonPulseHandler =
         Handler(
@@ -607,10 +614,22 @@ class MainActivity : AppCompatActivity() {
     ) {
 
         val textView =
-            TextView(this)
+            createSphereMessageView()
 
         textView.text =
             message
+
+        chatMessagesContainer.addView(
+            textView
+        )
+
+        scrollChatToBottom()
+    }
+
+    private fun createSphereMessageView(): TextView {
+
+        val textView =
+            TextView(this)
 
         textView.setTextColor(
             Color.parseColor(
@@ -653,11 +672,7 @@ class MainActivity : AppCompatActivity() {
         textView.layoutParams =
             params
 
-        chatMessagesContainer.addView(
-            textView
-        )
-
-        scrollChatToBottom()
+        return textView
     }
 
     private fun appendErrorMessage(
@@ -1334,7 +1349,7 @@ class MainActivity : AppCompatActivity() {
                     text =
                         if (
                             modelIds[index] ==
-                            currentModel
+                                currentModel
                         ) {
                             "●"
                         } else {
@@ -1469,7 +1484,7 @@ class MainActivity : AppCompatActivity() {
 
             if (
                 index <
-                modelIds.size - 1
+                    modelIds.size - 1
             ) {
 
                 val divider =
@@ -1795,85 +1810,173 @@ class MainActivity : AppCompatActivity() {
                     memoryContext
             )
 
-        openAiClient.sendMessage(
-            context =
-                this,
-            apiKeyUriString =
-                apiKeyUri,
-            message =
-                message,
-            instructions =
-                finalInstructions,
+        var streamingMessageView: TextView? =
+            null
 
-            onSuccess = { response ->
+        streamingResponseController
+            .sendMessage(
+                context =
+                    this,
+                apiKeyUriString =
+                    apiKeyUri,
+                model =
+                    openAiClient.getModel(),
+                message =
+                    message,
+                instructions =
+                    finalInstructions,
 
-                val assistantMessageId =
-                    conversationArchive
-                        .saveAssistantMessage(
-                            conversationId =
-                                conversationId,
-                            text =
-                                response.text,
-                            model =
-                                response.model
+                onDelta = { delta ->
+
+                    runOnUiThread {
+
+                        var messageView =
+                            streamingMessageView
+
+                        if (
+                            messageView ==
+                                null
+                        ) {
+
+                            messageView =
+                                createSphereMessageView()
+
+                            streamingMessageView =
+                                messageView
+
+                            chatMessagesContainer
+                                .addView(
+                                    messageView
+                                )
+                        }
+
+                        messageView.append(
+                            delta
                         )
 
-                if (
-                    assistantMessageId !=
-                        -1L
-                ) {
+                        scrollChatToBottom()
+                    }
+                },
 
-                    lastMessageId =
-                        assistantMessageId
+                onCompleted = { response ->
 
-                    rawBlockCoordinator
-                        .onAssistantMessageSaved(
-                            conversationId
+                    val assistantMessageId =
+                        conversationArchive
+                            .saveAssistantMessage(
+                                conversationId =
+                                    conversationId,
+                                text =
+                                    response.text,
+                                model =
+                                    response.model
+                            )
+
+                    if (
+                        assistantMessageId !=
+                            -1L
+                    ) {
+
+                        lastMessageId =
+                            assistantMessageId
+
+                        rawBlockCoordinator
+                            .onAssistantMessageSaved(
+                                conversationId
+                            )
+                    }
+
+                    saveSessionUsage(
+                        response
+                    )
+
+                    runOnUiThread {
+
+                        /*
+                         * Финальный Response является
+                         * источником истины.
+                         *
+                         * Даже если визуально все delta
+                         * уже пришли, выставляем итоговый
+                         * текст ещё раз целиком.
+                         */
+                        val messageView =
+                            streamingMessageView
+
+                        if (
+                            messageView !=
+                                null
+                        ) {
+
+                            messageView.text =
+                                response.text
+
+                        } else {
+
+                            appendSphereMessage(
+                                response.text
+                            )
+                        }
+
+                        isSendingMessage =
+                            false
+
+                        stopMoonPulse()
+
+                        scrollChatToBottom()
+
+                        keepInputActive()
+                    }
+                },
+
+                onError = { error ->
+
+                    runOnUiThread {
+
+                        /*
+                         * Частичный streaming-текст
+                         * не является завершённым
+                         * assistant message.
+                         *
+                         * Убираем его из UI,
+                         * чтобы он не выглядел как
+                         * сохранённый ответ.
+                         */
+                        val messageView =
+                            streamingMessageView
+
+                        if (
+                            messageView !=
+                                null
+                        ) {
+
+                            chatMessagesContainer
+                                .removeView(
+                                    messageView
+                                )
+
+                            streamingMessageView =
+                                null
+                        }
+
+                        isSendingMessage =
+                            false
+
+                        stopMoonPulse()
+
+                        appendErrorMessage(
+                            error
                         )
+
+                        Toast.makeText(
+                            this,
+                            "Ошибка API",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        keepInputActive()
+                    }
                 }
-
-                saveSessionUsage(
-                    response
-                )
-
-                runOnUiThread {
-
-                    isSendingMessage =
-                        false
-
-                    stopMoonPulse()
-
-                    appendSphereMessage(
-                        response.text
-                    )
-
-                    keepInputActive()
-                }
-            },
-
-            onError = { error ->
-
-                runOnUiThread {
-
-                    isSendingMessage =
-                        false
-
-                    stopMoonPulse()
-
-                    appendErrorMessage(
-                        error
-                    )
-
-                    Toast.makeText(
-                        this,
-                        "Ошибка API",
-                        Toast.LENGTH_SHORT
-                    ).show()
-
-                    keepInputActive()
-                }
-            }
-        )
+            )
     }
 
     private fun buildSphereInstructionsWithMemory(
