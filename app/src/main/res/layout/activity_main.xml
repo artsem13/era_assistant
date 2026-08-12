@@ -6,6 +6,21 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
+    <!-- КОСМИЧЕСКИЙ ФОН -->
+
+    <ImageView
+        android:id="@+id/eraSpaceBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/moon"
+        android:scaleType="centerCrop"
+        android:clickable="false"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:importantForAccessibility="no"
+        android:contentDescription="@null" />
+
+
     <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
 
     <LinearLayout
@@ -13,7 +28,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:background="#000000"
+        android:background="@android:color/transparent"
         android:paddingLeft="12dp"
         android:paddingTop="8dp"
         android:paddingRight="12dp">
@@ -25,6 +40,8 @@
             android:layout_height="48dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
+
+            <!-- ГАМБУРГЕР -->
 
             <Button
                 android:id="@+id/menuButton"
@@ -41,6 +58,24 @@
                 android:textColor="#FFFFFF"
                 android:textSize="22sp" />
 
+            <!-- ЗАМЕТКИ -->
+
+            <ImageButton
+                android:id="@+id/noteButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginLeft="6dp"
+                android:background="@drawable/bg_menu_button"
+                android:contentDescription="Заметка"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:padding="13dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_note_pen"
+                android:tint="#FFFFFF" />
+
+            <!-- НАЗВАНИЕ -->
+
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -50,17 +85,35 @@
                 android:textColor="#F5F5F5"
                 android:textSize="18sp" />
 
+            <!-- РАЗОВЫЙ STT -->
+
             <ImageButton
-                android:id="@+id/noteButton"
+                android:id="@+id/micButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginRight="6dp"
+                android:background="@drawable/bg_menu_button"
+                android:contentDescription="Микрофон"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:padding="12dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_mic"
+                android:tint="#FFFFFF" />
+
+            <!-- ГОЛОСОВОЙ РЕЖИМ -->
+
+            <ImageButton
+                android:id="@+id/voiceModeButton"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_menu_button"
-                android:contentDescription="Заметка"
+                android:contentDescription="Голосовой режим"
                 android:focusable="false"
                 android:focusableInTouchMode="false"
-                android:padding="13dp"
+                android:padding="12dp"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_note_pen"
+                android:src="@drawable/ic_voice_mode"
                 android:tint="#FFFFFF" />
 
         </LinearLayout>
@@ -99,7 +152,7 @@
             android:id="@+id/inputPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#000000"
+            android:background="@android:color/transparent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingTop="10dp"
