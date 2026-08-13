@@ -1,12 +1,17 @@
 package com.era.assistant.core.voice
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MicInputUiController(
@@ -28,6 +33,33 @@ class MicInputUiController(
 
         const val REQUEST_RECORD_AUDIO_PERMISSION =
             3001
+
+        private const val MIC_PULSE_CYCLE_MS =
+            1350L
+
+        private const val MIC_PULSE_FIRST_PHASE_MS =
+            140L
+
+        private const val MIC_PULSE_SECOND_PHASE_DELAY_MS =
+            140L
+
+        private const val MIC_PULSE_THIRD_PHASE_DELAY_MS =
+            320L
+
+        private const val MIC_PULSE_FINAL_PHASE_DELAY_MS =
+            450L
+
+        private const val MIC_RING_DIM_ALPHA =
+            70
+
+        private const val MIC_RING_MID_ALPHA =
+            118
+
+        private const val MIC_RING_BRIGHT_ALPHA =
+            205
+
+        private const val MIC_RING_COLOR =
+            "#E05252"
     }
 
     private val voiceInputController =
@@ -37,6 +69,104 @@ class MicInputUiController(
 
     private var isTranscribing =
         false
+
+    private val micPulseHandler =
+        Handler(
+            Looper.getMainLooper()
+        )
+
+    private var micPulseActive =
+        false
+
+    private var micPulseAnimator: ValueAnimator? =
+        null
+
+    private val micRingDrawable =
+        GradientDrawable().apply {
+
+            shape =
+                GradientDrawable.OVAL
+
+            setColor(
+                Color.TRANSPARENT
+            )
+
+            setStroke(
+                dpToPx(1),
+                Color.parseColor(
+                    MIC_RING_COLOR
+                )
+            )
+        }
+
+    private val micPulseRunnable =
+        object : Runnable {
+
+            override fun run() {
+
+                if (!micPulseActive) {
+                    return
+                }
+
+                animateMicRingAlpha(
+                    MIC_RING_BRIGHT_ALPHA,
+                    MIC_PULSE_FIRST_PHASE_MS
+                )
+
+                micPulseHandler.postDelayed(
+                    {
+
+                        if (!micPulseActive) {
+                            return@postDelayed
+                        }
+
+                        animateMicRingAlpha(
+                            MIC_RING_MID_ALPHA,
+                            180L
+                        )
+
+                    },
+                    MIC_PULSE_SECOND_PHASE_DELAY_MS
+                )
+
+                micPulseHandler.postDelayed(
+                    {
+
+                        if (!micPulseActive) {
+                            return@postDelayed
+                        }
+
+                        animateMicRingAlpha(
+                            MIC_RING_BRIGHT_ALPHA,
+                            130L
+                        )
+
+                    },
+                    MIC_PULSE_THIRD_PHASE_DELAY_MS
+                )
+
+                micPulseHandler.postDelayed(
+                    {
+
+                        if (!micPulseActive) {
+                            return@postDelayed
+                        }
+
+                        animateMicRingAlpha(
+                            MIC_RING_DIM_ALPHA,
+                            260L
+                        )
+
+                    },
+                    MIC_PULSE_FINAL_PHASE_DELAY_MS
+                )
+
+                micPulseHandler.postDelayed(
+                    this,
+                    MIC_PULSE_CYCLE_MS
+                )
+            }
+        }
 
     fun bind() {
 
@@ -52,12 +182,6 @@ class MicInputUiController(
             isTranscribing
         ) {
 
-            Toast.makeText(
-                activity,
-                "Подожди, распознаю речь",
-                Toast.LENGTH_SHORT
-            ).show()
-
             return
         }
 
@@ -68,11 +192,9 @@ class MicInputUiController(
             xaiKeyUri == null
         ) {
 
-            Toast.makeText(
-                activity,
-                "Выбери файл xAI API-ключа",
-                Toast.LENGTH_LONG
-            ).show()
+            showVoiceError(
+                "Выбери файл xAI API-ключа"
+            )
 
             chooseXaiApiKeyFile()
 
@@ -121,19 +243,16 @@ class MicInputUiController(
             started
         ) {
 
-            Toast.makeText(
-                activity,
-                "Говори. Нажми микрофон ещё раз, когда закончишь.",
-                Toast.LENGTH_SHORT
-            ).show()
+            messageInput.error =
+                null
+
+            startMicPulse()
 
         } else {
 
-            Toast.makeText(
-                activity,
-                "Не удалось запустить микрофон",
-                Toast.LENGTH_LONG
-            ).show()
+            showVoiceError(
+                "Не удалось запустить микрофон"
+            )
         }
     }
 
@@ -147,11 +266,7 @@ class MicInputUiController(
         micButton.isEnabled =
             false
 
-        Toast.makeText(
-            activity,
-            "Распознаю...",
-            Toast.LENGTH_SHORT
-        ).show()
+        stopMicPulse()
 
         voiceInputController
             .stopAndTranscribe(
@@ -182,13 +297,10 @@ class MicInputUiController(
                                 .length
                         )
 
-                        activateInput()
+                        messageInput.error =
+                            null
 
-                        Toast.makeText(
-                            activity,
-                            "Готово",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        activateInput()
                     }
                 },
 
@@ -202,11 +314,9 @@ class MicInputUiController(
                         micButton.isEnabled =
                             true
 
-                        Toast.makeText(
-                            activity,
-                            error,
-                            Toast.LENGTH_LONG
-                        ).show()
+                        showVoiceError(
+                            error
+                        )
 
                         activateInput()
                     }
@@ -269,11 +379,9 @@ class MicInputUiController(
             uri == null
         ) {
 
-            Toast.makeText(
-                activity,
-                "Файл xAI API-ключа не выбран",
-                Toast.LENGTH_SHORT
-            ).show()
+            showVoiceError(
+                "Файл xAI API-ключа не выбран"
+            )
 
             return true
         }
@@ -294,11 +402,8 @@ class MicInputUiController(
             )
             .apply()
 
-        Toast.makeText(
-            activity,
-            "xAI API-ключ подключён. Нажми микрофон ещё раз.",
-            Toast.LENGTH_LONG
-        ).show()
+        messageInput.error =
+            null
 
         return true
     }
@@ -326,17 +431,17 @@ class MicInputUiController(
 
         } else {
 
-            Toast.makeText(
-                activity,
-                "Без доступа к микрофону запись невозможна",
-                Toast.LENGTH_LONG
-            ).show()
+            showVoiceError(
+                "Без доступа к микрофону запись невозможна"
+            )
         }
 
         return true
     }
 
     fun release() {
+
+        stopMicPulse()
 
         voiceInputController
             .cancelRecording()
@@ -394,5 +499,109 @@ class MicInputUiController(
                 .text
                 .length
         )
+    }
+
+    private fun startMicPulse() {
+
+        if (
+            micPulseActive
+        ) {
+            return
+        }
+
+        micPulseActive =
+            true
+
+        micRingDrawable.alpha =
+            MIC_RING_DIM_ALPHA
+
+        micButton.foreground =
+            micRingDrawable
+
+        micPulseHandler.post(
+            micPulseRunnable
+        )
+    }
+
+    private fun stopMicPulse() {
+
+        micPulseActive =
+            false
+
+        micPulseHandler
+            .removeCallbacksAndMessages(
+                null
+            )
+
+        micPulseAnimator
+            ?.cancel()
+
+        micPulseAnimator =
+            null
+
+        micRingDrawable.alpha =
+            0
+
+        micButton.foreground =
+            null
+    }
+
+    private fun animateMicRingAlpha(
+        targetAlpha: Int,
+        duration: Long
+    ) {
+
+        micPulseAnimator
+            ?.cancel()
+
+        micPulseAnimator =
+            ValueAnimator
+                .ofInt(
+                    micRingDrawable.alpha,
+                    targetAlpha
+                )
+                .apply {
+
+                    this.duration =
+                        duration
+
+                    interpolator =
+                        AccelerateDecelerateInterpolator()
+
+                    addUpdateListener {
+
+                        micRingDrawable.alpha =
+                            it.animatedValue as Int
+
+                        micButton.invalidate()
+                    }
+
+                    start()
+                }
+    }
+
+    private fun dpToPx(
+        dp: Int
+    ): Int {
+
+        return (
+            dp *
+                activity
+                    .resources
+                    .displayMetrics
+                    .density
+            )
+            .toInt()
+            .coerceAtLeast(
+                1
+            )
+    }
+
+    private fun showVoiceError(
+        error: String
+    ) {
+
+        messageInput.error =
+            error
     }
 }

@@ -32,6 +32,7 @@ import com.era.assistant.core.memory.MemoryItemStore
 import com.era.assistant.core.memory.MemoryTopicRouter
 import com.era.assistant.core.memory.RawBlockCoordinator
 import com.era.assistant.core.voice.MicInputUiController
+import com.era.assistant.core.voice.VoiceModeController
 
 class MainActivity : AppCompatActivity() {
 
@@ -135,6 +136,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var memoryTopicRouter: MemoryTopicRouter
 
     private lateinit var micInputUiController: MicInputUiController
+
+    private lateinit var voiceModeController: VoiceModeController
 
     private lateinit var conversationId: String
 
@@ -346,7 +349,12 @@ class MainActivity : AppCompatActivity() {
                 R.id.micButton
             )
 
-        val menuInstructions =
+
+        val voiceModeButton =
+            findViewById<ImageButton>(
+                R.id.voiceModeButton
+            )
+val menuInstructions =
             findViewById<TextView>(
                 R.id.menuInstructions
             )
@@ -380,7 +388,16 @@ class MainActivity : AppCompatActivity() {
 
         micInputUiController.bind()
 
-        sendApiButton.isFocusable =
+
+        voiceModeController =
+            VoiceModeController(
+                activity = this,
+                voiceModeButton = voiceModeButton,
+                messageInput = messageInput
+            )
+
+        voiceModeController.bind()
+sendApiButton.isFocusable =
             false
 
         sendApiButton.isFocusableInTouchMode =
@@ -1700,7 +1717,9 @@ class MainActivity : AppCompatActivity() {
         isSendingMessage =
             true
 
-        val baseInstructions =
+
+        voiceModeController.onNewRequest()
+val baseInstructions =
             loadSphereInstructions()
 
         val userMessageId =
@@ -1845,7 +1864,9 @@ class MainActivity : AppCompatActivity() {
 
                 onDelta = { delta ->
 
-                    runOnUiThread {
+
+                    voiceModeController.onTextDelta(delta)
+runOnUiThread {
 
                         var messageView =
                             streamingMessageView
@@ -1877,7 +1898,9 @@ class MainActivity : AppCompatActivity() {
 
                 onCompleted = { response ->
 
-                    val assistantMessageId =
+
+                    voiceModeController.onResponseCompleted()
+val assistantMessageId =
                         conversationArchive
                             .saveAssistantMessage(
                                 conversationId =
@@ -1939,7 +1962,9 @@ class MainActivity : AppCompatActivity() {
 
                 onError = { error ->
 
-                    runOnUiThread {
+
+                    voiceModeController.onResponseFailed()
+runOnUiThread {
 
                         val messageView =
                             streamingMessageView
@@ -2606,6 +2631,10 @@ class MainActivity : AppCompatActivity() {
             .removeCallbacksAndMessages(
                 null
             )
+
+        if (::voiceModeController.isInitialized) {
+            voiceModeController.release()
+        }
 
         if (
             ::micInputUiController.isInitialized
