@@ -31,6 +31,7 @@ import com.era.assistant.core.ai.UsageCalculator
 import com.era.assistant.core.memory.MemoryItemStore
 import com.era.assistant.core.memory.MemoryTopicRouter
 import com.era.assistant.core.memory.RawBlockCoordinator
+import com.era.assistant.core.voice.MicInputUiController
 
 class MainActivity : AppCompatActivity() {
 
@@ -132,6 +133,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var memoryItemStore: MemoryItemStore
     private lateinit var memoryTopicRouter: MemoryTopicRouter
+
+    private lateinit var micInputUiController: MicInputUiController
 
     private lateinit var conversationId: String
 
@@ -338,6 +341,11 @@ class MainActivity : AppCompatActivity() {
                 R.id.noteButton
             )
 
+        val micButton =
+            findViewById<ImageButton>(
+                R.id.micButton
+            )
+
         val menuInstructions =
             findViewById<TextView>(
                 R.id.menuInstructions
@@ -362,6 +370,15 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(
                 R.id.menuLockTest
             )
+
+        micInputUiController =
+            MicInputUiController(
+                activity = this,
+                micButton = micButton,
+                messageInput = messageInput
+            )
+
+        micInputUiController.bind()
 
         sendApiButton.isFocusable =
             false
@@ -1891,14 +1908,6 @@ class MainActivity : AppCompatActivity() {
 
                     runOnUiThread {
 
-                        /*
-                         * Финальный Response является
-                         * источником истины.
-                         *
-                         * Даже если визуально все delta
-                         * уже пришли, выставляем итоговый
-                         * текст ещё раз целиком.
-                         */
                         val messageView =
                             streamingMessageView
 
@@ -1932,15 +1941,6 @@ class MainActivity : AppCompatActivity() {
 
                     runOnUiThread {
 
-                        /*
-                         * Частичный streaming-текст
-                         * не является завершённым
-                         * assistant message.
-                         *
-                         * Убираем его из UI,
-                         * чтобы он не выглядел как
-                         * сохранённый ответ.
-                         */
                         val messageView =
                             streamingMessageView
 
@@ -2356,43 +2356,92 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (
-            requestCode ==
-                REQUEST_OPEN_API_KEY &&
-            resultCode ==
+            ::micInputUiController.isInitialized &&
+            micInputUiController.onActivityResult(
+                requestCode = requestCode,
+                resultCode = resultCode,
+                data = data
+            )
+        ) {
+
+            return
+        }
+
+        if (
+            requestCode !=
+                REQUEST_OPEN_API_KEY
+        ) {
+
+            return
+        }
+
+        if (
+            resultCode !=
                 RESULT_OK
         ) {
 
-            val uri =
-                data?.data
-                    ?: return
+            return
+        }
 
-            try {
+        val uri =
+            data?.data
+                ?: return
 
-                contentResolver
-                    .takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
+        try {
 
-            } catch (_: Exception) {
-            }
-
-            getSharedPreferences(
-                PREFS_NAME,
-                MODE_PRIVATE
-            )
-                .edit()
-                .putString(
-                    KEY_API_KEY_URI,
-                    uri.toString()
+            contentResolver
+                .takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
-                .apply()
 
-            Toast.makeText(
-                this,
-                "API-ключ подключён",
-                Toast.LENGTH_SHORT
-            ).show()
+        } catch (
+            _: Exception
+        ) {
+        }
+
+        getSharedPreferences(
+            PREFS_NAME,
+            MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                KEY_API_KEY_URI,
+                uri.toString()
+            )
+            .apply()
+
+        Toast.makeText(
+            this,
+            "OpenAI API-ключ подключён",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
+
+        if (
+            ::micInputUiController.isInitialized &&
+            micInputUiController
+                .onRequestPermissionsResult(
+                    requestCode =
+                        requestCode,
+                    grantResults =
+                        grantResults
+                )
+        ) {
+
+            return
         }
     }
 
@@ -2438,7 +2487,8 @@ class MainActivity : AppCompatActivity() {
                 )
 
         if (
-            intent == null
+            intent ==
+                null
         ) {
 
             Toast.makeText(
@@ -2556,6 +2606,14 @@ class MainActivity : AppCompatActivity() {
             .removeCallbacksAndMessages(
                 null
             )
+
+        if (
+            ::micInputUiController.isInitialized
+        ) {
+
+            micInputUiController
+                .release()
+        }
 
         if (
             ::conversationArchive.isInitialized

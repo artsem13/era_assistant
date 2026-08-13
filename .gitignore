@@ -9,3 +9,13 @@
 /build
 /captures
 .externalNativeBuild
+
+# Local secrets and private runtime data
+.env
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.key
+*.keystore
