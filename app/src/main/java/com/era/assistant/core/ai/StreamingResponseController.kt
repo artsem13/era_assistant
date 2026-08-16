@@ -15,9 +15,9 @@ class StreamingResponseController(
         onDelta: (String) -> Unit,
         onCompleted: (OpenAiResponse) -> Unit,
         onError: (String) -> Unit
-    ) {
+    ): StreamingRequestHandle {
 
-        streamingClient.sendMessage(
+        return streamingClient.sendMessage(
             context = context,
             apiKeyUriString = apiKeyUriString,
             model = model,

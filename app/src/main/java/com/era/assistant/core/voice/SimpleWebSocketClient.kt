@@ -8,7 +8,7 @@ import java.security.SecureRandom
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
-/** Small text-frame WebSocket transport for the xAI streaming endpoint. */
+/** Small WebSocket transport for the xAI streaming endpoints. */
 class SimpleWebSocketClient(
     private val url: String,
     private val authorization: String,
@@ -18,6 +18,7 @@ class SimpleWebSocketClient(
     interface Listener {
         fun onOpen()
         fun onText(text: String)
+        fun onBinary(bytes: ByteArray)
         fun onError(error: String)
         fun onClosed()
     }
@@ -25,9 +26,12 @@ class SimpleWebSocketClient(
     private val lock = Any()
     private val random = SecureRandom()
     private val pendingTexts = ArrayList<String>()
+    private val pendingBinary = ArrayList<ByteArray>()
     private var socket: SSLSocket? = null
     private var output: OutputStream? = null
     private var closed = false
+    private var closeCode = -1
+    private var closeReason = ""
 
     fun connect() {
         Thread {
@@ -53,6 +57,8 @@ class SimpleWebSocketClient(
                     output = socketOutput
                     pendingTexts.forEach { writeTextFrame(socketOutput, it) }
                     pendingTexts.clear()
+                    pendingBinary.forEach { writeBinaryFrame(socketOutput, it) }
+                    pendingBinary.clear()
                 }
 
                 listener.onOpen()
@@ -72,17 +78,46 @@ class SimpleWebSocketClient(
         }.start()
     }
 
-    fun sendText(text: String) {
+    fun stateDescription(): String {
+        synchronized(lock) {
+            return when { closed -> "CLOSED code=" + closeCode + " reason=" + closeReason; output != null -> "OPEN"; else -> "CONNECTING" }
+        }
+    }
+
+    fun sendText(text: String): Boolean {
+        synchronized(lock) {
+            if (closed) return false
+            val socketOutput = output
+            if (socketOutput == null) {
+                pendingTexts.add(text)
+                return true
+            }
+            return try {
+                writeTextFrame(socketOutput, text)
+                true
+            } catch (error: Exception) {
+                listener.onError("WebSocket send failed state=" + stateDescription() + " error=" + (error.message ?: error.javaClass.simpleName))
+                false
+            }
+        }
+    }
+
+    fun closeCode(): Int = synchronized(lock) { closeCode }
+
+    fun closeReason(): String = synchronized(lock) { closeReason }
+
+    fun sendBinary(bytes: ByteArray) {
+        if (bytes.isEmpty()) return
         synchronized(lock) {
             if (closed) return
             val socketOutput = output
             if (socketOutput == null) {
-                pendingTexts.add(text)
+                pendingBinary.add(bytes.copyOf())
             } else {
                 try {
-                    writeTextFrame(socketOutput, text)
+                    writeBinaryFrame(socketOutput, bytes)
                 } catch (error: Exception) {
-                    listener.onError(error.message ?: "WebSocket send failed")
+                    listener.onError("WebSocket binary send failed state=" + stateDescription() + " error=" + (error.message ?: error.javaClass.simpleName))
                 }
             }
         }
@@ -97,6 +132,7 @@ class SimpleWebSocketClient(
             } catch (_: Exception) {
             }
             pendingTexts.clear()
+            pendingBinary.clear()
             try {
                 socket?.close()
             } catch (_: Exception) {
@@ -165,7 +201,14 @@ class SimpleWebSocketClient(
             }
             when (first and 0x0f) {
                 0x1 -> listener.onText(String(payload, Charsets.UTF_8))
-                0x8 -> return
+                0x2 -> listener.onBinary(payload)
+                0x8 -> {
+                    synchronized(lock) {
+                        closeCode = if (payload.size >= 2) ((payload[0].toInt() and 0xff) shl 8) or (payload[1].toInt() and 0xff) else -1
+                        closeReason = if (payload.size > 2) String(payload, 2, payload.size - 2, Charsets.UTF_8) else ""
+                    }
+                    return
+                }
                 0x9 -> synchronized(lock) { writeFrame(output, 0xA, payload) }
             }
         }
@@ -173,6 +216,10 @@ class SimpleWebSocketClient(
 
     private fun writeTextFrame(output: OutputStream, text: String) {
         writeFrame(output, 0x1, text.toByteArray(Charsets.UTF_8))
+    }
+
+    private fun writeBinaryFrame(output: OutputStream, bytes: ByteArray) {
+        writeFrame(output, 0x2, bytes)
     }
 
     private fun writeFrame(output: OutputStream, opcode: Int, payload: ByteArray) {

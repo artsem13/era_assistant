@@ -5,6 +5,8 @@ class TtsChunker(
 ) {
 
     private val buffer = StringBuilder()
+    private val wrappingTags = TtsExpressionProcessor.WRAPPING_TAGS
+    private val tagPattern = Regex("</?([A-Za-z][A-Za-z-]*)>")
 
     @Synchronized
     fun append(delta: String): List<String> {
@@ -35,17 +37,41 @@ class TtsChunker(
         val text = buffer.toString()
         for (index in text.indices) {
             val character = text[index]
-            if (character == '.' || character == '!' || character == '?' || character == '。' || character == '！' || character == '？') {
+            if (character == '.' || character == '!' || character == '?' ||
+                character == '。' || character == '！' || character == '？') {
                 val nextIsBoundary = index == text.lastIndex || text[index + 1].isWhitespace()
-                if (nextIsBoundary) return index + 1
+                if (nextIsBoundary && wrapperDepthAt(text, index + 1) == 0) return index + 1
             }
         }
 
         if (text.length < maxChunkLength) return -1
+
         val limit = maxChunkLength.coerceAtMost(text.length)
-        val punctuation = text.substring(0, limit).indexOfLast { it == ',' || it == ';' || it == ':' }
+        var punctuation = -1
+        for (index in 0 until limit) {
+            if ((text[index] == ',' || text[index] == ';' || text[index] == ':') &&
+                wrapperDepthAt(text, index + 1) == 0) {
+                punctuation = index
+            }
+        }
         if (punctuation >= maxChunkLength / 2) return punctuation + 1
-        val whitespace = text.substring(0, limit).indexOfLast { it.isWhitespace() }
+
+        var whitespace = -1
+        for (index in 0 until limit) {
+            if (text[index].isWhitespace() && wrapperDepthAt(text, index + 1) == 0) {
+                whitespace = index
+            }
+        }
         return if (whitespace > 0) whitespace else -1
+    }
+
+    private fun wrapperDepthAt(text: String, endExclusive: Int): Int {
+        var depth = 0
+        tagPattern.findAll(text.substring(0, endExclusive.coerceAtMost(text.length))).forEach { match ->
+            val name = match.groupValues[1].toLowerCase()
+            if (!wrappingTags.contains(name)) return@forEach
+            if (match.value.startsWith("</")) depth = (depth - 1).coerceAtLeast(0) else depth++
+        }
+        return depth
     }
 }

@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -27,10 +28,19 @@ import com.era.assistant.core.ai.OpenAiClient
 import com.era.assistant.core.ai.OpenAiResponse
 import com.era.assistant.core.ai.OpenAiStreamingClient
 import com.era.assistant.core.ai.StreamingResponseController
+import com.era.assistant.core.ai.StreamingRequestHandle
 import com.era.assistant.core.ai.UsageCalculator
+import com.era.assistant.core.memory.MemoryContextBuilder
+import com.era.assistant.core.memory.MemoryEmbeddingIndexer
+import com.era.assistant.core.memory.MemoryEmbeddingStore
 import com.era.assistant.core.memory.MemoryItemStore
-import com.era.assistant.core.memory.MemoryTopicRouter
+import com.era.assistant.core.memory.OpenAiEmbeddingClient
 import com.era.assistant.core.memory.RawBlockCoordinator
+import com.era.assistant.core.memory.SemanticMemoryRetriever
+import com.era.assistant.core.ui.ConversationMessageViewFactory
+import com.era.assistant.core.ui.ConversationViewportController
+import com.era.assistant.core.blackbox.BlackBoxController
+import com.era.assistant.core.blackbox.BlackBoxState
 import com.era.assistant.core.voice.MicInputUiController
 import com.era.assistant.core.voice.VoiceModeController
 
@@ -118,10 +128,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendApiButton: ImageButton
     private lateinit var chatScrollView: ScrollView
     private lateinit var chatMessagesContainer: LinearLayout
+    private lateinit var conversationMessageViewFactory: ConversationMessageViewFactory
+    private lateinit var conversationViewportController: ConversationViewportController
 
     private lateinit var sideMenu: LinearLayout
     private lateinit var menuScrim: View
     private lateinit var menuModel: TextView
+    private lateinit var menuBlackBox: TextView
+    private lateinit var blackBoxIndicator: TextView
 
     private lateinit var conversationArchive: ConversationArchive
     private lateinit var conversationSessionManager: ConversationSessionManager
@@ -133,7 +147,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rawBlockCoordinator: RawBlockCoordinator
 
     private lateinit var memoryItemStore: MemoryItemStore
-    private lateinit var memoryTopicRouter: MemoryTopicRouter
+    private lateinit var memoryRetriever: SemanticMemoryRetriever
+    private lateinit var memoryEmbeddingIndexer: MemoryEmbeddingIndexer
 
     private lateinit var micInputUiController: MicInputUiController
 
@@ -166,6 +181,24 @@ class MainActivity : AppCompatActivity() {
 
     private var isSendingMessage =
         false
+
+    private val blackBoxHandler = Handler(Looper.getMainLooper())
+    private val blackBoxStateListener: (BlackBoxState) -> Unit = { state ->
+        updateBlackBoxIndicator(state)
+        blackBoxHandler.removeCallbacks(blackBoxRefreshRunnable)
+        if (state.active) blackBoxHandler.post(blackBoxRefreshRunnable)
+    }
+    private val blackBoxRefreshRunnable = object : Runnable {
+        override fun run() {
+            val state = BlackBoxController.state()
+            updateBlackBoxIndicator(state)
+            if (state.active) blackBoxHandler.postDelayed(this, 500L)
+        }
+    }
+
+    private var activeStreamingRequest: StreamingRequestHandle? = null
+    private var sendGeneration = 0L
+    private var activeStreamingMessageView: ConversationMessageViewFactory.MessageView? = null
 
     private val moonPulseRunnable =
         object : Runnable {
@@ -248,6 +281,10 @@ class MainActivity : AppCompatActivity() {
             R.layout.activity_main
         )
 
+        blackBoxIndicator = findViewById(R.id.blackBoxIndicator)
+        BlackBoxController.initialize(this)
+        BlackBoxController.addListener(blackBoxStateListener)
+
         conversationArchive =
             ConversationArchive(this)
 
@@ -265,8 +302,27 @@ class MainActivity : AppCompatActivity() {
                 conversationArchive
             )
 
-        memoryTopicRouter =
-            MemoryTopicRouter()
+        val memoryEmbeddingStore =
+            MemoryEmbeddingStore(
+                conversationArchive
+            )
+
+        val embeddingClient =
+            OpenAiEmbeddingClient()
+
+        memoryRetriever =
+            SemanticMemoryRetriever(
+                memoryItemStore = memoryItemStore,
+                embeddingStore = memoryEmbeddingStore,
+                embeddingClient = embeddingClient
+            )
+
+        memoryEmbeddingIndexer =
+            MemoryEmbeddingIndexer(
+                memoryItemStore = memoryItemStore,
+                embeddingStore = memoryEmbeddingStore,
+                embeddingClient = embeddingClient
+            )
 
         rawBlockCoordinator =
             RawBlockCoordinator(
@@ -304,6 +360,12 @@ class MainActivity : AppCompatActivity() {
                 R.id.messageInput
             )
 
+        conversationMessageViewFactory =
+            ConversationMessageViewFactory(
+                context = this,
+                inputField = messageInput
+            )
+
         sendApiButton =
             findViewById(
                 R.id.sendApiButton
@@ -317,6 +379,17 @@ class MainActivity : AppCompatActivity() {
         chatMessagesContainer =
             findViewById(
                 R.id.chatMessagesContainer
+            )
+
+        conversationViewportController =
+            ConversationViewportController(
+                root = findViewById(R.id.mainContent),
+                chatScrollView = chatScrollView,
+                chatMessagesContainer = chatMessagesContainer,
+                topControls = findViewById(R.id.topControls),
+                inputPanel = findViewById(R.id.inputPanel),
+                topFade = findViewById(R.id.conversationTopFade),
+                bottomFade = findViewById(R.id.conversationBottomFade)
             )
 
         sideMenu =
@@ -354,6 +427,7 @@ class MainActivity : AppCompatActivity() {
             findViewById<ImageButton>(
                 R.id.voiceModeButton
             )
+        val interruptButton = findViewById<Button>(R.id.interruptButton)
 val menuInstructions =
             findViewById<TextView>(
                 R.id.menuInstructions
@@ -362,6 +436,11 @@ val menuInstructions =
         val menuUsage =
             findViewById<TextView>(
                 R.id.menuUsage
+            )
+
+        menuBlackBox =
+            findViewById(
+                R.id.menuBlackBox
             )
 
         val menuApiKey =
@@ -383,7 +462,10 @@ val menuInstructions =
             MicInputUiController(
                 activity = this,
                 micButton = micButton,
-                messageInput = messageInput
+                messageInput = messageInput,
+                isVoiceModeActive = {
+                    ::voiceModeController.isInitialized && voiceModeController.isActive()
+                }
             )
 
         micInputUiController.bind()
@@ -393,10 +475,17 @@ val menuInstructions =
             VoiceModeController(
                 activity = this,
                 voiceModeButton = voiceModeButton,
-                messageInput = messageInput
+                interruptButton = interruptButton,
+                messageInput = messageInput,
+                onVoiceMessage = { text -> sendTextToSphere(text, "voice") },
+                onAssistantInterrupt = { cancelActiveVoiceResponse() },
+                isManualMicRecording = {
+                    ::micInputUiController.isInitialized && micInputUiController.isRecording()
+                }
             )
 
         voiceModeController.bind()
+
 sendApiButton.isFocusable =
             false
 
@@ -484,6 +573,13 @@ sendApiButton.isFocusable =
             openUsageScreen()
         }
 
+        menuBlackBox.setOnClickListener {
+
+            closeSideMenu()
+
+            openBlackBoxScreen()
+        }
+
         menuApiKey.setOnClickListener {
 
             closeSideMenu()
@@ -564,80 +660,12 @@ sendApiButton.isFocusable =
     private fun appendUserMessage(
         message: String
     ) {
-
-        val textView =
-            TextView(this)
-
-        textView.text =
-            message
-
-        textView.setTextColor(
-            Color.parseColor(
-                "#F2F2F2"
-            )
-        )
-
-        textView.textSize =
-            16f
-
-        textView.setLineSpacing(
-            dpToPx(3).toFloat(),
-            1f
-        )
-
-        textView.setPadding(
-            dpToPx(16),
-            dpToPx(11),
-            dpToPx(16),
-            dpToPx(11)
-        )
-
-        textView.setTextIsSelectable(
-            true
-        )
-
-        val bubble =
-            GradientDrawable()
-
-        bubble.shape =
-            GradientDrawable.RECTANGLE
-
-        bubble.setColor(
-            Color.parseColor(
-                "#2A2A2A"
-            )
-        )
-
-        bubble.cornerRadius =
-            dpToPx(20).toFloat()
-
-        textView.background =
-            bubble
-
-        textView.maxWidth =
-            resources
-                .displayMetrics
-                .widthPixels -
-                dpToPx(70)
-
-        val params =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        params.setMargins(
-            0,
-            dpToPx(10),
-            0,
-            dpToPx(10)
-        )
-
-        textView.layoutParams =
-            params
+        val messageView =
+            conversationMessageViewFactory
+                .createUserMessage(message)
 
         chatMessagesContainer.addView(
-            textView
+            messageView.row
         )
 
         scrollChatToBottom()
@@ -646,70 +674,23 @@ sendApiButton.isFocusable =
     private fun appendSphereMessage(
         message: String
     ) {
-
-        val textView =
-            createSphereMessageView()
-
-        textView.text =
-            message
+        val messageView =
+            conversationMessageViewFactory
+                .createSphereMessage(message)
 
         chatMessagesContainer.addView(
-            textView
+            messageView.row
         )
 
         scrollChatToBottom()
     }
 
-    private fun createSphereMessageView(): TextView {
-
-        val textView =
-            TextView(this)
-
-        textView.setTextColor(
-            Color.parseColor(
-                "#EAEAEA"
-            )
-        )
-
-        textView.textSize =
-            16f
-
-        textView.setLineSpacing(
-            dpToPx(3).toFloat(),
-            1f
-        )
-
-        textView.setPadding(
-            0,
-            dpToPx(6),
-            0,
-            dpToPx(6)
-        )
-
-        textView.setTextIsSelectable(
-            true
-        )
-
-        val params =
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-        params.setMargins(
-            0,
-            dpToPx(8),
-            0,
-            dpToPx(10)
-        )
-
-        textView.layoutParams =
-            params
-
-        return textView
+    private fun createSphereMessageView(): ConversationMessageViewFactory.MessageView {
+        return conversationMessageViewFactory.createSphereMessage()
     }
 
     private fun appendErrorMessage(
+
         message: String
     ) {
 
@@ -758,15 +739,8 @@ sendApiButton.isFocusable =
         scrollChatToBottom()
     }
 
-    private fun scrollChatToBottom() {
-
-        chatScrollView.post {
-
-            chatScrollView.smoothScrollTo(
-                0,
-                chatMessagesContainer.height
-            )
-        }
+    private fun scrollChatToBottom(force: Boolean = true) {
+        conversationViewportController.scrollToLatestMessage(force)
     }
 
     private fun openSideMenu() {
@@ -929,6 +903,22 @@ sendApiButton.isFocusable =
                 AccelerateDecelerateInterpolator()
             )
             .start()
+    }
+
+    private fun openBlackBoxScreen() {
+        startActivity(Intent(this, BlackBoxActivity::class.java))
+    }
+
+    private fun updateBlackBoxIndicator(state: BlackBoxState) {
+        if (!::blackBoxIndicator.isInitialized) return
+        if (!state.active) {
+            blackBoxIndicator.visibility = View.GONE
+            blackBoxIndicator.text = ""
+            return
+        }
+        val totalSeconds = ((state.remainingMs + 999L) / 1000L).coerceAtLeast(0L)
+        blackBoxIndicator.text = String.format("● REC %02d:%02d", totalSeconds / 60L, totalSeconds % 60L)
+        blackBoxIndicator.visibility = View.VISIBLE
     }
 
     private fun openUsageScreen() {
@@ -1662,346 +1652,184 @@ sendApiButton.isFocusable =
 
     private fun sendMessageToSphere() {
 
-        if (
-            isSendingMessage
-        ) {
-            return
-        }
+        if (isSendingMessage) return
 
-        val message =
-            messageInput
-                .text
-                .toString()
-                .trim()
-
-        if (
-            message.isBlank()
-        ) {
-
-            Toast.makeText(
-                this,
-                "Сначала напиши сообщение",
-                Toast.LENGTH_SHORT
-            ).show()
-
+        val message = messageInput.text.toString().trim()
+        if (message.isBlank()) {
+            Toast.makeText(this, "Сначала напиши сообщение", Toast.LENGTH_SHORT).show()
             keepInputActive()
-
             return
         }
 
-        val apiKeyUri =
-            getSharedPreferences(
-                PREFS_NAME,
-                MODE_PRIVATE
-            )
-                .getString(
-                    KEY_API_KEY_URI,
-                    null
-                )
+        sendTextToSphere(message, "text")
+    }
 
-        if (
-            apiKeyUri == null
-        ) {
+    private fun sendTextToSphere(text: String, source: String) {
+        val message = text.trim()
+        if (message.isBlank() || isSendingMessage) return
 
-            Toast.makeText(
-                this,
-                "Сначала выбери API-ключ через меню",
-                Toast.LENGTH_LONG
-            ).show()
-
+        val apiKeyUri = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getString(KEY_API_KEY_URI, null)
+        if (apiKeyUri == null) {
+            Toast.makeText(this, "Сначала выбери API-ключ через меню", Toast.LENGTH_LONG).show()
+            if (source == "voice") voiceModeController.onResponseFailed("OpenAI API key unavailable")
             keepInputActive()
-
             return
         }
 
-        isSendingMessage =
-            true
-
-
+        isSendingMessage = true
+        val generation = ++sendGeneration
+        activeStreamingRequest = null
+        activeStreamingMessageView = null
         voiceModeController.onNewRequest()
-val baseInstructions =
-            loadSphereInstructions()
+        voiceModeController.onMemoryRetrievalStart()
 
-        val userMessageId =
-            conversationArchive
-                .saveUserMessage(
-                    conversationId =
-                        conversationId,
-                    text =
-                        message,
-                    source =
-                        "text"
-                )
-
-        if (
-            userMessageId !=
-                -1L
-        ) {
-
-            lastMessageId =
-                userMessageId
-        }
-
-        appendUserMessage(
-            message
+        val baseInstructions = loadSphereInstructions()
+        val userMessageId = conversationArchive.saveUserMessage(
+            conversationId = conversationId,
+            text = message,
+            source = source
         )
+        if (userMessageId != -1L) lastMessageId = userMessageId
 
-        messageInput
-            .text
-            .clear()
-
+        appendUserMessage(message)
+        if (source == "text") messageInput.text.clear()
         keepInputActive()
-
         startMoonPulse()
 
-        val topics =
-            memoryItemStore
-                .getTopics()
+        memoryEmbeddingIndexer.indexMissingAsync(
+            context = this,
+            apiKeyUriString = apiKeyUri
+        )
 
-        if (
-            topics.isEmpty()
-        ) {
-
-            sendMessageWithMemoryContext(
-                apiKeyUri =
-                    apiKeyUri,
-                message =
-                    message,
-                baseInstructions =
-                    baseInstructions,
-                memoryContext =
-                    ""
-            )
-
-            return
-        }
-
-        memoryTopicRouter.route(
-            context =
-                this,
-            apiKeyUriString =
-                apiKeyUri,
-            userMessage =
-                message,
-            topics =
-                topics,
-
-            onSuccess = { selectedTopics ->
-
-                val memoryContext =
-                    try {
-
-                        memoryItemStore
-                            .buildTopicContext(
-                                selectedTopics
-                            )
-
-                    } catch (
-                        _: Exception
-                    ) {
-
-                        ""
-                    }
-
-                sendMessageWithMemoryContext(
-                    apiKeyUri =
-                        apiKeyUri,
-                    message =
-                        message,
-                    baseInstructions =
-                        baseInstructions,
-                    memoryContext =
-                        memoryContext
-                )
+        memoryRetriever.retrieve(
+            context = this,
+            apiKeyUriString = apiKeyUri,
+            query = message,
+            onSuccess = { selectedMemories ->
+                voiceModeController.onMemoryRetrievalEnd()
+                if (generation == sendGeneration) {
+                    sendMessageWithMemoryContext(
+                        generation = generation,
+                        apiKeyUri = apiKeyUri,
+                        message = message,
+                        baseInstructions = baseInstructions,
+                        memoryContext = MemoryContextBuilder.build(selectedMemories)
+                    )
+                }
             },
-
             onError = {
-
-                sendMessageWithMemoryContext(
-                    apiKeyUri =
-                        apiKeyUri,
-                    message =
-                        message,
-                    baseInstructions =
-                        baseInstructions,
-                    memoryContext =
-                        ""
-                )
+                voiceModeController.onMemoryRetrievalEnd()
+                if (generation == sendGeneration) {
+                    sendMessageWithMemoryContext(
+                        generation = generation,
+                        apiKeyUri = apiKeyUri,
+                        message = message,
+                        baseInstructions = baseInstructions,
+                        memoryContext = ""
+                    )
+                }
             }
         )
     }
 
     private fun sendMessageWithMemoryContext(
+        generation: Long,
         apiKeyUri: String,
         message: String,
         baseInstructions: String,
         memoryContext: String
     ) {
+        if (generation != sendGeneration) return
 
-        val finalInstructions =
-            buildSphereInstructionsWithMemory(
-                baseInstructions =
-                    baseInstructions,
-                memoryContext =
-                    memoryContext
-            )
+        val finalInstructions = buildSphereInstructionsWithMemory(
+            baseInstructions = baseInstructions,
+            memoryContext = memoryContext
+        )
 
-        var streamingMessageView: TextView? =
-            null
-
-        streamingResponseController
-            .sendMessage(
-                context =
-                    this,
-                apiKeyUriString =
-                    apiKeyUri,
-                model =
-                    openAiClient.getModel(),
-                message =
-                    message,
-                instructions =
-                    finalInstructions,
-
-                onDelta = { delta ->
-
-
+        voiceModeController.onOpenAiRequestStart()
+        voiceModeController.onUserMessageSent(message)
+        val request = streamingResponseController.sendMessage(
+            context = this,
+            apiKeyUriString = apiKeyUri,
+            model = openAiClient.getModel(),
+            message = message,
+            instructions = finalInstructions,
+            onDelta = { delta ->
+                if (generation == sendGeneration) {
                     voiceModeController.onTextDelta(delta)
-runOnUiThread {
-
-                        var messageView =
-                            streamingMessageView
-
-                        if (
-                            messageView ==
-                                null
-                        ) {
-
-                            messageView =
-                                createSphereMessageView()
-
-                            streamingMessageView =
-                                messageView
-
-                            chatMessagesContainer
-                                .addView(
-                                    messageView
-                                )
-                        }
-
-                        messageView.append(
-                            delta
-                        )
-
-                        scrollChatToBottom()
-                    }
-                },
-
-                onCompleted = { response ->
-
-
-                    voiceModeController.onResponseCompleted()
-val assistantMessageId =
-                        conversationArchive
-                            .saveAssistantMessage(
-                                conversationId =
-                                    conversationId,
-                                text =
-                                    response.text,
-                                model =
-                                    response.model
-                            )
-
-                    if (
-                        assistantMessageId !=
-                            -1L
-                    ) {
-
-                        lastMessageId =
-                            assistantMessageId
-
-                        rawBlockCoordinator
-                            .onAssistantMessageSaved(
-                                conversationId
-                            )
-                    }
-
-                    saveSessionUsage(
-                        response
-                    )
-
                     runOnUiThread {
-
-                        val messageView =
-                            streamingMessageView
-
-                        if (
-                            messageView !=
-                                null
-                        ) {
-
-                            messageView.text =
-                                response.text
-
-                        } else {
-
-                            appendSphereMessage(
-                                response.text
-                            )
+                        if (generation != sendGeneration) return@runOnUiThread
+                        var messageView = activeStreamingMessageView
+                        if (messageView == null) {
+                            messageView = createSphereMessageView()
+                            activeStreamingMessageView = messageView
+                            chatMessagesContainer.addView(messageView.row)
                         }
-
-                        isSendingMessage =
-                            false
-
-                        stopMoonPulse()
-
-                        scrollChatToBottom()
-
-                        keepInputActive()
+                        messageView.bubble.append(delta)
+                        scrollChatToBottom(force = false)
                     }
-                },
-
-                onError = { error ->
-
-
-                    voiceModeController.onResponseFailed()
-runOnUiThread {
-
-                        val messageView =
-                            streamingMessageView
-
-                        if (
-                            messageView !=
-                                null
-                        ) {
-
-                            chatMessagesContainer
-                                .removeView(
-                                    messageView
-                                )
-
-                            streamingMessageView =
-                                null
+                }
+            },
+            onCompleted = { response ->
+                if (generation == sendGeneration) {
+                    activeStreamingRequest = null
+                    voiceModeController.onResponseCompleted(response.text)
+                    val assistantMessageId = conversationArchive.saveAssistantMessage(
+                        conversationId = conversationId,
+                        text = response.text,
+                        model = response.model
+                    )
+                    if (assistantMessageId != -1L) {
+                        lastMessageId = assistantMessageId
+                        rawBlockCoordinator.onAssistantMessageSaved(conversationId)
+                    }
+                    saveSessionUsage(response)
+                    runOnUiThread {
+                        val messageView = activeStreamingMessageView
+                        if (messageView != null) {
+                            messageView.bubble.text = response.text
+                        } else {
+                            appendSphereMessage(response.text)
                         }
-
-                        isSendingMessage =
-                            false
-
+                        activeStreamingMessageView = null
+                        isSendingMessage = false
                         stopMoonPulse()
-
-                        appendErrorMessage(
-                            error
-                        )
-
-                        Toast.makeText(
-                            this,
-                            "Ошибка API",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
+                        scrollChatToBottom(force = false)
                         keepInputActive()
                     }
                 }
-            )
+            },
+            onError = { error ->
+                if (generation == sendGeneration) {
+                    activeStreamingRequest = null
+                    voiceModeController.onResponseFailed(error)
+                    runOnUiThread {
+                        activeStreamingMessageView?.let {
+                            chatMessagesContainer.removeView(it.row)
+                        }
+                        activeStreamingMessageView = null
+                        isSendingMessage = false
+                        stopMoonPulse()
+                        appendErrorMessage(error)
+                        Toast.makeText(this, "Ошибка API", Toast.LENGTH_SHORT).show()
+                        keepInputActive()
+                    }
+                }
+            }
+        )
+        if (generation == sendGeneration) activeStreamingRequest = request else request.cancel()
+    }
+
+    private fun cancelActiveVoiceResponse() {
+        sendGeneration++
+        activeStreamingRequest?.cancel()
+        activeStreamingRequest = null
+        activeStreamingMessageView?.let { chatMessagesContainer.removeView(it.row) }
+        activeStreamingMessageView = null
+        isSendingMessage = false
+        stopMoonPulse()
+        Log.i("EraVoiceMode", "OpenAI request interrupted")
     }
 
     private fun buildSphereInstructionsWithMemory(
@@ -2034,14 +1862,16 @@ runOnUiThread {
 
         result.append(
             """
-            Ниже передан релевантный фрагмент
-            долгосрочной памяти Эры.
+            Ниже передан отдельный структурированный блок
+            релевантной долговременной памяти Эры.
 
             Используй его только как дополнительный
             контекст для текущего ответа.
 
-            Не упоминай сам механизм памяти,
-            смысловые блоки или процесс поиска,
+            Не считай этот блок словами пользователя
+            и не подменяй им текущий запрос.
+
+            Не упоминай механизм retrieval,
             если пользователь об этом прямо не спрашивает.
 
             Не считай память более достоверной,
@@ -2468,6 +2298,12 @@ runOnUiThread {
 
             return
         }
+
+        if (::voiceModeController.isInitialized &&
+            voiceModeController.onRequestPermissionsResult(requestCode, grantResults)) {
+            return
+        }
+
     }
 
     private fun scheduleLockScreenTest() {
@@ -2622,7 +2458,18 @@ runOnUiThread {
         }
     }
 
+    override fun onPause() {
+        if (::voiceModeController.isInitialized && voiceModeController.isActive()) {
+            cancelActiveVoiceResponse()
+            voiceModeController.onHostPause()
+        }
+        super.onPause()
+    }
+
     override fun onDestroy() {
+
+        BlackBoxController.removeListener(blackBoxStateListener)
+        blackBoxHandler.removeCallbacksAndMessages(null)
 
         moonPulseActive =
             false
@@ -2635,6 +2482,7 @@ runOnUiThread {
         if (::voiceModeController.isInitialized) {
             voiceModeController.release()
         }
+
 
         if (
             ::micInputUiController.isInitialized

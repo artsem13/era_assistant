@@ -23,21 +23,67 @@
 
     <!-- ОСНОВНОЙ ИНТЕРФЕЙС -->
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/mainContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:background="@android:color/transparent"
         android:paddingLeft="12dp"
         android:paddingTop="8dp"
         android:paddingRight="12dp">
 
-        <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+        <!-- CONVERSATION LAYER -->
+
+        <ScrollView
+            android:id="@+id/chatScrollView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/chatMessagesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp" />
+
+        </ScrollView>
+
+        <!-- ВИЗУАЛЬНЫЕ ГРАНИЦЫ CONVERSATION; TOUCH НЕ ПЕРЕХВАТЫВАЮТ -->
+
+        <View
+            android:id="@+id/conversationTopFade"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_gravity="top"
+            android:clickable="false"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:importantForAccessibility="no"
+            android:contentDescription="@null" />
+
+        <View
+            android:id="@+id/conversationBottomFade"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_gravity="bottom"
+            android:clickable="false"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:importantForAccessibility="no"
+            android:contentDescription="@null" />
+
+        <!-- ВЕРХНИЕ CONTROLS OVERLAY -->
 
         <LinearLayout
+            android:id="@+id/topControls"
             android:layout_width="match_parent"
             android:layout_height="48dp"
+            android:layout_gravity="top"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -74,16 +120,16 @@
                 android:src="@drawable/ic_note_pen"
                 android:tint="#FFFFFF" />
 
-            <!-- НАЗВАНИЕ -->
-
             <TextView
+                android:id="@+id/blackBoxIndicator"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="Эра"
-                android:textColor="#F5F5F5"
-                android:textSize="18sp" />
+                android:textColor="#FF9A9A"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <!-- РАЗОВЫЙ STT -->
 
@@ -116,42 +162,26 @@
                 android:src="@drawable/ic_voice_mode"
                 android:tint="#FFFFFF" />
 
+            <Button
+                android:id="@+id/interruptButton"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginLeft="6dp"
+                android:background="@drawable/bg_menu_button"
+                android:text="INTERRUPT"
+                android:textColor="#FFFFFF"
+                android:textSize="9sp"
+                android:visibility="gone" />
+
         </LinearLayout>
 
-
-        <!-- ЧАТ -->
-
-        <ScrollView
-            android:id="@+id/chatScrollView"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="4dp"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:overScrollMode="never"
-            android:paddingBottom="8dp"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:id="@+id/chatMessagesContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingLeft="8dp"
-                android:paddingTop="12dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="12dp" />
-
-        </ScrollView>
-
-
-        <!-- ПОЛЕ ВВОДА -->
+        <!-- ПОЛЕ ВВОДА OVERLAY -->
 
         <LinearLayout
             android:id="@+id/inputPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
             android:background="@android:color/transparent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
@@ -192,7 +222,7 @@
 
         </LinearLayout>
 
-    </LinearLayout>
+    </FrameLayout>
 
 
     <!-- ЗАТЕМНЕНИЕ ЗА МЕНЮ -->
@@ -264,6 +294,24 @@
             android:paddingLeft="22dp"
             android:paddingRight="18dp"
             android:text="Использование"
+            android:textColor="#F2F4F8"
+            android:textSize="16sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginLeft="18dp"
+            android:layout_marginRight="18dp"
+            android:background="#252C37" />
+
+        <TextView
+            android:id="@+id/menuBlackBox"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:gravity="center_vertical"
+            android:paddingLeft="22dp"
+            android:paddingRight="18dp"
+            android:text="Чёрный ящик"
             android:textColor="#F2F4F8"
             android:textSize="16sp" />
 

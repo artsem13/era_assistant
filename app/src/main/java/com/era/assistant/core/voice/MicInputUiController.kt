@@ -17,7 +17,8 @@ import androidx.appcompat.app.AppCompatActivity
 class MicInputUiController(
     private val activity: AppCompatActivity,
     private val micButton: ImageButton,
-    private val messageInput: EditText
+    private val messageInput: EditText,
+    private val isVoiceModeActive: () -> Boolean = { false }
 ) {
 
     companion object {
@@ -177,6 +178,11 @@ class MicInputUiController(
     }
 
     private fun handleMicButton() {
+
+        if (isVoiceModeActive()) {
+            showVoiceError("Сначала выключи Voice Mode")
+            return
+        }
 
         if (
             isTranscribing
@@ -437,6 +443,10 @@ class MicInputUiController(
         }
 
         return true
+    }
+
+    fun isRecording(): Boolean {
+        return voiceInputController.isRecording()
     }
 
     fun release() {

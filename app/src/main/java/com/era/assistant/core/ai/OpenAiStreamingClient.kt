@@ -29,7 +29,9 @@ class OpenAiStreamingClient {
         onDelta: (String) -> Unit,
         onCompleted: (OpenAiResponse) -> Unit,
         onError: (String) -> Unit
-    ) {
+    ): StreamingRequestHandle {
+
+        val request = StreamingRequestHandle()
 
         Thread {
 
@@ -68,6 +70,8 @@ class OpenAiStreamingClient {
                     )
                         .openConnection()
                         as HttpURLConnection
+
+                request.attach(connection ?: return@Thread)
 
                 connection.requestMethod =
                     "POST"
@@ -160,6 +164,8 @@ class OpenAiStreamingClient {
                             it.readLine()
                                 ?: break
 
+                        if (request.isCancelled()) return@Thread
+
                         if (
                             line.isBlank()
                         ) {
@@ -250,6 +256,8 @@ class OpenAiStreamingClient {
                                             delta
                                         )
 
+                                    if (request.isCancelled()) return@Thread
+
                                     onDelta(
                                         delta
                                     )
@@ -320,6 +328,8 @@ class OpenAiStreamingClient {
 
                                 completed =
                                     true
+
+                                if (request.isCancelled()) return@Thread
 
                                 onCompleted(
                                     result
@@ -445,6 +455,8 @@ class OpenAiStreamingClient {
                 error: Exception
             ) {
 
+                if (request.isCancelled()) return@Thread
+
                 onError(
                     "OpenAI streaming error: " +
                         (
@@ -459,6 +471,7 @@ class OpenAiStreamingClient {
 
                 try {
 
+                    request.detach()
                     connection
                         ?.disconnect()
 
@@ -469,6 +482,8 @@ class OpenAiStreamingClient {
             }
 
         }.start()
+
+        return request
     }
 
     fun resetConversation() {

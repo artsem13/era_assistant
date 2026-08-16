@@ -39,6 +39,18 @@ class RawBlockCoordinator(
             archive
         )
 
+    private val memoryEmbeddingStore =
+        MemoryEmbeddingStore(
+            archive
+        )
+
+    private val memoryEmbeddingIndexer =
+        MemoryEmbeddingIndexer(
+            memoryItemStore = memoryItemStore,
+            embeddingStore = memoryEmbeddingStore,
+            embeddingClient = OpenAiEmbeddingClient()
+        )
+
     fun onAssistantMessageSaved(
         conversationId: String
     ) {
@@ -167,6 +179,12 @@ class RawBlockCoordinator(
                         _: Exception
                     ) {
                     }
+
+                    memoryEmbeddingIndexer
+                        .indexMissingAsync(
+                            context = context,
+                            apiKeyUriString = apiKeyUri
+                        )
 
                     LocalMemoryBackup
                         .backupInBackground(

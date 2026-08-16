@@ -18,6 +18,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".BlackBoxActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".EraKeyguardTestActivity"
             android:exported="false"
             android:excludeFromRecents="true" />

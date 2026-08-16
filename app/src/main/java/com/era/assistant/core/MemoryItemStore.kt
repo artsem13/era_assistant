@@ -680,6 +680,75 @@ class MemoryItemStore(
         return result
     }
 
+
+    fun getActiveItems(): List<MemoryItem> {
+
+        val result =
+            mutableListOf<MemoryItem>()
+
+        val cursor =
+            archive
+                .readableDatabase
+                .query(
+                    TABLE_MEMORY_ITEMS,
+                    arrayOf(
+                        COLUMN_ID,
+                        COLUMN_TOPIC_ID,
+                        COLUMN_CONTENT,
+                        COLUMN_SEARCH_TEXT
+                    ),
+                    "$COLUMN_STATUS = ?",
+                    arrayOf(
+                        STATUS_ACTIVE
+                    ),
+                    null,
+                    null,
+                    "$COLUMN_ID ASC"
+                )
+
+        cursor.use {
+
+            while (
+                it.moveToNext()
+            ) {
+
+                result.add(
+                    MemoryItem(
+                        id =
+                            it.getLong(
+                                it.getColumnIndexOrThrow(
+                                    COLUMN_ID
+                                )
+                            ),
+
+                        topicId =
+                            it.getLong(
+                                it.getColumnIndexOrThrow(
+                                    COLUMN_TOPIC_ID
+                                )
+                            ),
+
+                        content =
+                            it.getString(
+                                it.getColumnIndexOrThrow(
+                                    COLUMN_CONTENT
+                                )
+                            ),
+
+                        searchText =
+                            it.getString(
+                                it.getColumnIndexOrThrow(
+                                    COLUMN_SEARCH_TEXT
+                                )
+                            )
+                    )
+                )
+            }
+        }
+
+        return result
+    }
+
     fun getItemsForTopicName(
         topicName: String
     ): List<MemoryItem> {

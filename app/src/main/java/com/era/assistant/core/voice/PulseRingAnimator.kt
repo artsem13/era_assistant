@@ -11,7 +11,8 @@ import android.view.animation.AccelerateDecelerateInterpolator
 /** The shared ring pulse used by the microphone and Voice Mode buttons. */
 class PulseRingAnimator(
     private val button: View,
-    ringColor: String = "#E05252"
+    ringColor: String = "#E05252",
+    private val onPulseAlphaChanged: ((Int) -> Unit)? = null
 ) {
 
     companion object {
@@ -28,6 +29,8 @@ class PulseRingAnimator(
 
     private val handler = Handler(Looper.getMainLooper())
     private var active = false
+    private var iconPulseEnabled = false
+    private var iconReady = false
     private var animator: ValueAnimator? = null
     private val ring = GradientDrawable().apply {
         shape = GradientDrawable.OVAL
@@ -60,6 +63,7 @@ class PulseRingAnimator(
         if (active) return
         active = true
         ring.alpha = DIM_ALPHA
+        onPulseAlphaChanged?.invoke(if (iconReady) 255 else 0)
         button.foreground = ring
         handler.post(pulse)
     }
@@ -70,7 +74,20 @@ class PulseRingAnimator(
         animator?.cancel()
         animator = null
         ring.alpha = 0
+        iconPulseEnabled = false
+        onPulseAlphaChanged?.invoke(0)
         button.foreground = null
+    }
+
+    fun setIconReady(ready: Boolean) {
+        iconReady = ready
+        if (!iconPulseEnabled) onPulseAlphaChanged?.invoke(if (ready) 255 else 0)
+    }
+
+    fun setIconPulseEnabled(enabled: Boolean) {
+        iconPulseEnabled = enabled
+        if (!enabled) onPulseAlphaChanged?.invoke(if (iconReady) 255 else 0)
+        else onPulseAlphaChanged?.invoke(ring.alpha)
     }
 
     private fun animateTo(targetAlpha: Int, duration: Long) {
@@ -80,6 +97,7 @@ class PulseRingAnimator(
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener {
                 ring.alpha = it.animatedValue as Int
+                if (iconPulseEnabled) onPulseAlphaChanged?.invoke(ring.alpha)
                 button.invalidate()
             }
             start()
