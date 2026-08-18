@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".executor.termux.TermuxDeviceTestActivity"
+            android:exported="true"
+            android:label="ERA Termux test"
+            android:excludeFromRecents="true" />
+    </application>
+</manifest>
