@@ -1,0 +1,2 @@
+rootProject.name = 'era-probe2-run-command'
+include ':app'

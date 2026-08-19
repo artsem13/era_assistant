@@ -19,11 +19,13 @@ internal object TermuxExecutorConfig {
     const val WORKER_PROTOCOL_VERSION = 1
     const val WORKER_PATH = "/data/data/com.termux/files/home/.era/era-worker.sh"
     const val CAPABILITY_RUNTIME_INFO = "termux_runtime_info"
+    const val CAPABILITY_CURRENT_LOCATION = "get_current_location"
     const val RUN = "RUN"
     const val STATUS = "STATUS"
     const val RESULT = "RESULT"
     const val CANCEL = "CANCEL"
     const val CAPABILITY_RUNTIME_INFO_DELAY = "termux_runtime_info_delay"
+    const val CAPABILITY_LIFECYCLE_PROBE = "termux_lifecycle_probe"
     const val TRANSPORT_TIMEOUT_MS = 15_000L
     const val STATUS_REGISTRATION_RETRIES = 3
     const val STATUS_REGISTRATION_RETRY_DELAY_MS = 50L

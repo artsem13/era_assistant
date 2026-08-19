@@ -1,0 +1,257 @@
+{
+  "probe": "03_x_search",
+  "request": {
+    "model": "grok-4.3",
+    "reasoning_effort": "low",
+    "tools": [
+      {
+        "type": "x_search"
+      }
+    ],
+    "include": [],
+    "input": "Найди последние официальные сообщения аккаунта xAI в X о Grok. Используй X Search. Кратко перечисли 2–3 наиболее свежих релевантных сообщения и дай прямые ссылки на посты."
+  },
+  "wall_clock_start": "2026-08-17T00:19:54.360810+00:00",
+  "wall_clock_end": "2026-08-17T00:20:14.861814+00:00",
+  "latency_ms": 20503.7,
+  "http_status": 200,
+  "response": {
+    "created_at": 1786926014,
+    "completed_at": 1786926014,
+    "id": "4c163ad5-666d-95cc-9673-1c5c3e77e057",
+    "max_output_tokens": null,
+    "model": "grok-4.3",
+    "object": "response",
+    "output": [
+      {
+        "id": "rs_4c163ad5-666d-95cc-9673-1c5c3e77e057",
+        "summary": [
+          {
+            "text": "The question is in Russian: \"Найди последние официальные сообщения аккаунта xAI в X о Grok. Используй X Search. Кратко перечисли 2–3 наиболее свежих релевантных сообщения и дай прямые ссылки на посты....",
+            "type": "summary_text"
+          }
+        ],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-0",
+        "input": "{\"query\":\"from:xai Grok\",\"limit\":\"5\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-0",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-1",
+        "input": "{\"query\":\"from:xai grok\",\"limit\":\"5\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-1",
+        "status": "completed"
+      },
+      {
+        "id": "tco_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-0",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "id": "tco_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-1",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-2",
+        "input": "{\"query\":\"xAI\",\"count\":\"3\"}",
+        "name": "x_user_search",
+        "type": "custom_tool_call",
+        "id": "ctc_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-2",
+        "status": "completed"
+      },
+      {
+        "id": "tco_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-2",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "call_id": "xs_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-3",
+        "input": "{\"query\":\"from:xai\",\"limit\":\"3\",\"mode\":\"Latest\"}",
+        "name": "x_keyword_search",
+        "type": "custom_tool_call",
+        "id": "ctc_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-3",
+        "status": "completed"
+      },
+      {
+        "id": "tco_4c163ad5-666d-95cc-9673-1c5c3e77e057_call-acdb2ade-29cb-4b8a-9c82-7b96ca0c35fb-3",
+        "summary": [],
+        "type": "reasoning",
+        "status": "completed"
+      },
+      {
+        "content": [
+          {
+            "type": "output_text",
+            "text": "**Вот 3 самых свежих релевантных поста от официального аккаунта xAI (сейчас @SpaceXAI) о Grok:**\n\n- **2 июля 2026**: «Grok Build is now installed in Railway sandboxes».  \n  Прямая ссылка: https://x.com/SpaceXAI/status/2072738598663946648\n\n- **1 июля 2026**: «Introducing Voice Agent Builder: a no-code platform to create human-like voice agents with Grok Voice. Available today at $0.05 / min.»  \n  Прямая ссылка: https://x.com/SpaceXAI/status/2072342803787702422\n\n- **24 июня 2026**: «Use the official @MongoDB plugin in Grok Build to query data, optimize indexes, and manage databases.»  \n  Прямая ссылка: https://x.com/SpaceXAI/status/2069809728088350789\n\n(Поиск выполнен через X Keyword Search по `from:xai Grok` в режиме Latest.)",
+            "logprobs": [],
+            "annotations": [
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/user/1495989282636722177",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/user/1495989282636722177"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2072342803787702422",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2072342803787702422"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/user/1351271303823585282",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/user/1351271303823585282"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2069536627349962987",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2069536627349962987"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2069809728088350789",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2069809728088350789"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2072342807193550900",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2072342807193550900"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/user/803596156102025217",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/user/803596156102025217"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2072342809034789088",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2072342809034789088"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2074214064746832060",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2074214064746832060"
+              },
+              {
+                "type": "url_citation",
+                "url": "https://x.com/i/status/2072738598663946648",
+                "start_index": 0,
+                "end_index": 0,
+                "title": "https://x.com/i/status/2072738598663946648"
+              }
+            ]
+          }
+        ],
+        "id": "msg_4c163ad5-666d-95cc-9673-1c5c3e77e057",
+        "role": "assistant",
+        "type": "message",
+        "status": "completed"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "previous_response_id": null,
+    "reasoning": {
+      "effort": "low",
+      "summary": "detailed"
+    },
+    "temperature": 0.7,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "x_search"
+      }
+    ],
+    "top_p": 0.95,
+    "usage": {
+      "input_tokens": 18638,
+      "input_tokens_details": {
+        "cached_tokens": 8896
+      },
+      "output_tokens": 1765,
+      "output_tokens_details": {
+        "reasoning_tokens": 1536
+      },
+      "total_tokens": 20403,
+      "num_sources_used": 0,
+      "num_server_side_tools_used": 4,
+      "cost_in_usd_ticks": 383692000,
+      "server_side_tool_usage_details": {
+        "web_search_calls": 0,
+        "x_search_calls": 4,
+        "code_interpreter_calls": 0,
+        "file_search_calls": 0,
+        "mcp_calls": 0,
+        "document_search_calls": 0,
+        "image_generation_calls": 0
+      },
+      "context_details": {
+        "input_tokens": 6826,
+        "output_tokens": 476
+      }
+    },
+    "user": null,
+    "incomplete_details": null,
+    "status": "completed",
+    "store": true,
+    "metadata": {
+      "system_fingerprint": "fp_eb3c003fc66c14ed"
+    },
+    "background": false,
+    "service_tier": "default",
+    "truncation": "disabled",
+    "top_logprobs": 0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0,
+    "prompt_cache_key": null,
+    "max_tool_calls": null,
+    "safety_identifier": null,
+    "error": null,
+    "instructions": null
+  },
+  "observed": {
+    "input_tokens": 18638,
+    "cached_tokens": 8896,
+    "output_tokens": 1765,
+    "reasoning_tokens": 1536,
+    "total_tokens": 20403,
+    "num_server_side_tools_used": 4,
+    "web_search_calls": 0,
+    "x_search_calls": 4,
+    "cost_in_usd_ticks": 383692000,
+    "cost_usd": 0.0383692,
+    "cost_rub": 3.83692
+  }
+}

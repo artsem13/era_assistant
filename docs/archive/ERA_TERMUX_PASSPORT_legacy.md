@@ -44,7 +44,7 @@ The confirmed callback contains nested `result` → `Bundle`; the receiver also 
 
 ## Worker protocol
 
-Protocol version `1`, worker version `1.1.0`; actual current form:
+Protocol version `1`, worker version `1.2.0`; actual current form:
 
 ```text
 era-worker.sh RUN    TASK_ID CAPABILITY       # exactly 3 arguments
@@ -60,6 +60,7 @@ era-worker.sh STATUS TASK_ID                  # exactly 2 arguments
 | ID | Arguments | Side effects/classification | Implementation | Device test |
 |---|---|---|---|---|
 | `termux_runtime_info` | none | Read-only, bounded runtime metadata; low risk | dispatcher, `TermuxExecutorConfig`, `termux/era-worker.sh` | PASS |
+| `termux_lifecycle_probe` | none | Debug-only fixed 120-second heartbeat task; private state; identity-scoped cancellation | debug Activity, `TermuxExecutorConfig`, `termux/era-worker.sh` | IMPLEMENTED; device test required |
 
 `ARBITRARY_SHELL = NOT EXPOSED`; unknown capability policy is `DENY BY DEFAULT`. Every new capability must be added to this table and both validation layers before device PASS.
 
@@ -77,13 +78,13 @@ The phone is a temporary host. Termux is an optional adapter/executor, not an Er
 
 ## Result contract
 
-Current `ExternalTaskState`: `CREATED`, `STARTING`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`, `UNAVAILABLE`, `SUSPENDED_OR_UNREACHABLE`. Accepted/running states never prove completion; `COMPLETED` requires validated output; `FAILED` covers request/worker/transport/invalid-result failure; `UNAVAILABLE` covers host configuration; `SUSPENDED_OR_UNREACHABLE` covers bounded callback timeout. Cancellation is implemented as cooperative, terminal-safe/idempotent worker state control; no process kill is used. After a confirmed `CANCELLED` control result, the adapter treats that state as authoritative for late RUN callbacks and RESULT observations. Timeout is capped at 15 seconds; no durable task store exists.
+Current `ExternalTaskState`: `CREATED`, `STARTING`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`, `UNAVAILABLE`, `SUSPENDED_OR_UNREACHABLE`. Accepted/running states never prove completion; `COMPLETED` requires validated output; `FAILED` covers request/worker/transport/invalid-result failure; `UNAVAILABLE` covers host configuration; `SUSPENDED_OR_UNREACHABLE` covers bounded callback timeout. Cancellation is terminal-safe/idempotent worker state control. The diagnostic `termux_lifecycle_probe` additionally records parent/descendant PIDs and kills only that recorded process tree; production capabilities retain their existing control behavior. After a confirmed `CANCELLED` control result, the adapter treats that state as authoritative for late RUN callbacks and RESULT observations. Timeout is capped at 15 seconds; no durable task store exists.
 
 `ExternalTaskStart(RUNNING)` means that `RunCommandService.startService()` accepted the worker launch; it does not promise that the worker has already persisted its `.state` file. `TermuxExecutor.getStatus()`, `getResult()`, and `cancelTask()` therefore retry `task_not_found` only for a taskId recorded as just launched by that executor, with 3 bounded retries at 50 ms. Other task IDs retain immediate unknown-task failure semantics. A confirmed `CANCELLED` response records cancellation authority before the callback is delivered, so late RUN/RESULT observations remain terminally `CANCELLED`. Diagnostics classify the outcome as `just_launched_registration_exhausted` or `unknown_task` and expose CANCEL retry/success plus final STATUS/RESULT observations.
 
 ## Debug diagnostics
 
-`TermuxDeviceTestActivity` is debug-only and registered only by the debug manifest. Open it in a debug build, use either lifecycle button, then `COPY DIAGNOSTIC OUTPUT`. It reports bounded availability, RUN launch, each control action/task ID/args array, callback Bundle and parsed result details. Normal lifecycle (`RUN → STATUS → RESULT`) and cancellation (`RUN → CANCEL → STATUS → RESULT`) are separate diagnostic flows. STATUS and RESULT registration races are logged separately from unknown task IDs, including bounded retry attempts and final classification. It must not silently become production UI or AI API.
+`TermuxDeviceTestActivity` is debug-only and registered only by the debug manifest. Its Probe 2 button runs the fixed `termux_lifecycle_probe`, observes STATUS after heartbeats, requests CANCEL, then queries final STATUS/RESULT; output includes bounded heartbeat, private-journal marker, PID liveness, callback IDs, and late-result rejection classification. The current neutral protocol has taskId identity but no attemptId. Open it in a debug build, use either lifecycle button, then `COPY DIAGNOSTIC OUTPUT`. It reports bounded availability, RUN launch, each control action/task ID/args array, callback Bundle and parsed result details. Normal lifecycle (`RUN → STATUS → RESULT`) and cancellation (`RUN → CANCEL → STATUS → RESULT`) are separate diagnostic flows. STATUS and RESULT registration races are logged separately from unknown task IDs, including bounded retry attempts and final classification. It must not silently become production UI or AI API.
 
 ## Confirmed tests
 
@@ -94,6 +95,9 @@ PHASE3_COMPLETE=YES
 PHASE4_COMPLETE=YES
 PHASE5_COMPLETE=YES
 PHASE5_DEVICE_TEST=PASS
+PROBE2_IMPLEMENTED=YES
+PROBE2_DEVICE_TEST_REQUIRED=YES
+PROBE2_COMPLETE=NO
 RUN_TRANSPORT=PASS
 WORKER_EXECUTION=PASS
 STATUS=PASS
@@ -124,8 +128,8 @@ bash -n ~/.era/era-worker.sh
 
 ## Known limitations
 
-- Only `termux_runtime_info` is supported; arbitrary shell is intentionally absent.
-- Short-operation cancellation and durable external task storage are not implemented.
+- The production dispatcher exposes only `termux_runtime_info`; Probe 2 is debug-only and arbitrary shell is intentionally absent.
+- Short-operation cancellation and durable external task storage are not implemented. Probe 2 process-tree and late-callback claims remain device-test pending.
 - Permission/configuration/worker installation/callback reachability depend on each host.
 - Worker installation is separate from the Era APK; diagnostics are not production capability UI.
 
@@ -149,3 +153,4 @@ APK/repository supply the neutral contract, adapter, receiver, permission, and d
 - Phase 4: neutral dispatcher for the fixed `termux_runtime_info` capability and debug-only device path.
 
 - Phase 5: STATUS/RESULT/CANCEL controls, recently-launched registration-race retries, authoritative CANCELLED semantics, and confirmed real-device E2E PASS.
+- Probe 2 implementation: fixed long-running heartbeat capability, private PID journal fields, identity-scoped process-tree cancellation, bounded debug flow, and late-result rejection logging; device confirmation remains pending.

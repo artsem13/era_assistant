@@ -1,0 +1,54 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.era.probe2"
+4    android:versionCode="1"
+5    android:versionName="0.1-probe2" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="23"
+8-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+9        android:targetSdkVersion="29" />
+9-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+10
+11    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+11-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:3:5-73
+11-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:3:22-70
+12
+13    <application
+13-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:5:5-21:19
+14        android:allowBackup="false"
+14-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:8:9-36
+15        android:debuggable="true"
+16        android:label="Era Probe 2"
+16-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:6:9-36
+17        android:supportsRtl="true"
+17-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:9:9-35
+18        android:theme="@android:style/Theme.Material.Light.NoActionBar" >
+18-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:7:9-72
+19        <activity
+19-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:10:9-17:20
+20            android:name="com.era.probe2.MainActivity"
+20-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:11:13-41
+21            android:exported="true" >
+21-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:12:13-36
+22            <intent-filter>
+22-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:13:13-16:29
+23                <action android:name="android.intent.action.MAIN" />
+23-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:14:17-69
+23-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:14:25-66
+24
+25                <category android:name="android.intent.category.LAUNCHER" />
+25-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:15:17-77
+25-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:15:27-74
+26            </intent-filter>
+27        </activity>
+28
+29        <receiver
+29-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:18:9-20:40
+30            android:name="com.era.probe2.CommandResultReceiver"
+30-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:19:13-50
+31            android:exported="false" />
+31-->/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:20:13-37
+32    </application>
+33
+34</manifest>

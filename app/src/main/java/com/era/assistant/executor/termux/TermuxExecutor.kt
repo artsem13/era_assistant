@@ -56,7 +56,7 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
             diagnostics?.event("startTask stopped", "state=${available.state} detail=${available.detail}")
             onStarted(ExternalTaskStart(null, available.copy(taskId = taskId))); return
         }
-        if (request.capabilityId != TermuxExecutorConfig.CAPABILITY_RUNTIME_INFO && request.capabilityId != TermuxExecutorConfig.CAPABILITY_RUNTIME_INFO_DELAY || request.arguments.isNotEmpty()) {
+        if (request.capabilityId != TermuxExecutorConfig.CAPABILITY_RUNTIME_INFO && request.capabilityId != TermuxExecutorConfig.CAPABILITY_RUNTIME_INFO_DELAY && request.capabilityId != TermuxExecutorConfig.CAPABILITY_LIFECYCLE_PROBE && request.capabilityId != TermuxExecutorConfig.CAPABILITY_CURRENT_LOCATION || request.arguments.isNotEmpty()) {
             onStarted(ExternalTaskStart(null, ExternalTaskStatus(taskId, ExternalTaskState.FAILED, "Unsupported capability request"))); return
         }
         val resultTimeout = Runnable {
@@ -223,6 +223,7 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
     private fun applyCancellationAuthority(taskId: String, result: ExternalTaskResult): ExternalTaskResult {
         val cancelled = synchronized(launchLock) { cancelledTaskIds.contains(taskId) }
         return if (cancelled && result.state != ExternalTaskState.CANCELLED) {
+            diagnostics?.event("late result rejected", "taskId=$taskId observed=${result.state} authoritative=CANCELLED")
             result.copy(state = ExternalTaskState.CANCELLED, error = null)
         } else result
     }
@@ -232,7 +233,7 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
         val arguments = TermuxExecutorConfig.controlArguments(action, taskId)
         diagnostics?.event(
             "control launch",
-            "action=$action taskId=$taskId capability=<none> args=${describeArguments(arguments)}"
+            "callbackId=$controlId action=$action taskId=$taskId capability=<none> args=${describeArguments(arguments)}"
         )
         var delivered = false
         val deliver = { text: String ->
@@ -241,7 +242,9 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
         val timeout = Runnable { TermuxResultRegistry.remove(controlId); deliver("status=SUSPENDED_OR_UNREACHABLE") }
         handler.postAtTime(timeout, controlId, android.os.SystemClock.uptimeMillis() + TermuxExecutorConfig.TRANSPORT_TIMEOUT_MS)
         TermuxResultRegistry.register(controlId) { envelope ->
-            deliver(envelope.resultBundle?.getString(TermuxExecutorConfig.RESULT_STDOUT) ?: envelope.extras?.getString(TermuxExecutorConfig.RESULT_STDOUT) ?: "")
+            val stdout = envelope.resultBundle?.getString(TermuxExecutorConfig.RESULT_STDOUT) ?: envelope.extras?.getString(TermuxExecutorConfig.RESULT_STDOUT) ?: ""
+            diagnostics?.event("control result raw", "action=$action taskId=$taskId stdout=${bounded(stdout)}")
+            deliver(stdout)
         }
         try { app.startService(workerIntent(controlId, arguments)) }
         catch (_: SecurityException) { TermuxResultRegistry.remove(controlId); deliver("status=UNAVAILABLE") }
@@ -251,14 +254,20 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
         val state = field(stdout, "status")
         if (state == null) return ExternalTaskStatus(taskId, ExternalTaskState.FAILED, "Invalid worker control result: missing status")
         val mapped = try { ExternalTaskState.valueOf(state) } catch (_: Exception) { ExternalTaskState.SUSPENDED_OR_UNREACHABLE }
-        return ExternalTaskStatus(taskId, mapped, field(stdout, "error"))
+        return ExternalTaskStatus(taskId, mapped, field(stdout, "error") ?: controlDiagnostics(stdout))
     }
     private fun parseControlResult(taskId: String, stdout: String): ExternalTaskResult {
         val status = parseControlStatus(taskId, stdout)
-        val value = field(stdout, "result")
+        val value = field(stdout, "result") ?: controlDiagnostics(stdout)
+        diagnostics?.event("RESULT extracted result", "taskId=$taskId payload=${bounded(value)}")
         return ExternalTaskResult(taskId, status.state, output = value, error = field(stdout, "error")?.let { ExternalTaskError("WORKER_CONTROL", it) }, truncated = value?.length ?: 0 >= TermuxExecutorConfig.MAX_RESULT_CHARS)
     }
     private fun field(text: String, name: String): String? = text.lineSequence().firstOrNull { it.startsWith(name + "=") }?.substringAfter('=')?.take(TermuxExecutorConfig.MAX_RESULT_CHARS)
+    private fun controlDiagnostics(text: String): String? {
+        val names = listOf("heartbeat", "lastHeartbeat", "parentPid", "childPid", "parentAlive", "descendantAlive", "journal")
+        val values = names.mapNotNull { name -> field(text, name)?.let { "$name=$it" } }
+        return values.takeIf { it.isNotEmpty() }?.joinToString(" ")?.take(TermuxExecutorConfig.MAX_RESULT_CHARS)
+    }
 
     private fun workerIntent(taskId: String, arguments: Array<String> = TermuxExecutorConfig.workerArguments(taskId, TermuxExecutorConfig.CAPABILITY_RUNTIME_INFO)): Intent {
         val callback = Intent(app, TermuxResultReceiver::class.java).putExtra(TermuxExecutorConfig.EXTRA_ERA_TASK_ID, taskId)
@@ -285,7 +294,7 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
             val errorMessage = bundle.getString(TermuxExecutorConfig.RESULT_ERROR_MESSAGE)
             return ExternalTaskResult(taskId, ExternalTaskState.FAILED, output = stderr.ifBlank { null }, error = ExternalTaskError("WORKER_FAILED", errorMessage ?: "Fixed worker returned a failure"), truncated = stderr.length >= TermuxExecutorConfig.MAX_RESULT_CHARS)
         }
-        if (!isValidRuntimeInfo(stdout)) return invalidResult(taskId, "Worker result is invalid")
+        if (!isValidWorkerOutput(stdout)) return invalidResult(taskId, "Worker result is invalid")
         return ExternalTaskResult(taskId, ExternalTaskState.COMPLETED, output = stdout, truncated = stdout.length >= TermuxExecutorConfig.MAX_RESULT_CHARS)
     }
     private fun describeParseInput(bundle: Bundle?): String {
@@ -320,6 +329,9 @@ class TermuxExecutor(context: Context) : ExternalExecutor {
         val version = lines.firstOrNull { it.startsWith("workerProtocolVersion=") }?.substringAfter('=')
         return version == TermuxExecutorConfig.WORKER_PROTOCOL_VERSION.toString() && fields.contains("runtime") && fields.contains("workerVersion") && lines.all { it.length <= TermuxExecutorConfig.MAX_OUTPUT_CHARS }
     }
+    private fun isValidWorkerOutput(output: String): Boolean =
+        isValidRuntimeInfo(output) || (output.trim().startsWith("{") && output.trim().endsWith("}"))
+
     private fun bounded(value: String?): String = bounded(value, TermuxExecutorConfig.MAX_RESULT_CHARS)
     private fun bounded(value: String?, limit: Int): String {
         val text = value ?: ""

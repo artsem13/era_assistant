@@ -4,6 +4,11 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import com.era.assistant.executor.android.TwoGisRouteCapability
+import com.era.assistant.executor.capability.CurrentLocation
+import com.era.assistant.executor.capability.LocationCapabilityResult
+import com.era.assistant.executor.capability.RouteDestination
+import com.era.assistant.executor.capability.RouteOrigin
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
@@ -19,6 +24,7 @@ import com.era.assistant.executor.ExternalTaskStart
 class TermuxDeviceTestActivity : Activity() {
     private val log = StringBuilder()
     private lateinit var output: TextView
+    private var lastLocation: CurrentLocation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +35,18 @@ class TermuxDeviceTestActivity : Activity() {
         val cancel = Button(this).apply {
             text = "RUN → CANCEL → STATUS → RESULT"
             setOnClickListener { runDiagnostic(true) }
+        }
+        val lifecycle = Button(this).apply {
+            text = "RUN LIFECYCLE PROBE (120s / heartbeat)"
+            setOnClickListener { runLifecycleProbe() }
+        }
+        val location = Button(this).apply {
+            text = "GET CURRENT LOCATION"
+            setOnClickListener { getLocation() }
+        }
+        val route = Button(this).apply {
+            text = "OPEN 2GIS ROUTE (diagnostic destination)"
+            setOnClickListener { openDiagnosticRoute() }
         }
         val copy = Button(this).apply {
             text = "COPY DIAGNOSTIC OUTPUT"
@@ -44,10 +62,63 @@ class TermuxDeviceTestActivity : Activity() {
             setPadding(32, 32, 32, 32)
             addView(run)
             addView(cancel)
+            addView(lifecycle)
+            addView(location)
+            addView(route)
             addView(copy)
             addView(ScrollView(this@TermuxDeviceTestActivity).apply { addView(output) }, LinearLayout.LayoutParams(-1, 0, 1f))
         })
         append("ready (Android ${android.os.Build.VERSION.SDK_INT})")
+    }
+
+    private fun getLocation() {
+        log.setLength(0)
+        append("GET CURRENT LOCATION started")
+        val executor = TermuxExecutor(this, object : TermuxDiagnosticSink {
+            override fun event(name: String, detail: String?) = append(name + if (detail.isNullOrBlank()) "" else ": $detail")
+            override fun callback(envelope: TermuxResultEnvelope) = append("callback received: ${describeCallback(envelope)}")
+        })
+        TermuxLocationCapability(executor).getCurrentLocation { result -> showLocation(result) }
+    }
+
+    private fun showLocation(result: LocationCapabilityResult) {
+        append("location state=${result.state} lat=${result.location?.latitude} lon=${result.location?.longitude} accuracy=${result.location?.accuracyMeters} provider=${result.location?.provider} error=${result.error}")
+        if (result.location != null) lastLocation = result.location
+    }
+
+    private fun openDiagnosticRoute() {
+        val origin = lastLocation
+        if (origin == null) { append("route state=FAILED error=get current location first"); return }
+        val result = TwoGisRouteCapability(this).openRoute(RouteOrigin(origin.latitude, origin.longitude), RouteDestination(55.752425, 37.613983))
+        append("route state=${result.state} deeplink=${result.deeplink} error=${result.error}")
+    }
+
+    private fun runLifecycleProbe() {
+        log.setLength(0)
+        append("Probe 2 started: fixed capability=termux_lifecycle_probe duration=120s heartbeat=1s")
+        append("attempt identity: current protocol has taskId only; no attemptId")
+        val executor = TermuxExecutor(this, object : TermuxDiagnosticSink {
+            override fun event(name: String, detail: String?) = append(name + if (detail.isNullOrBlank()) "" else ": $detail")
+            override fun callback(envelope: TermuxResultEnvelope) = append("callback received: ${describeCallback(envelope)}")
+        })
+        try {
+            executor.startTask(ExternalTaskRequest(TermuxExecutorConfig.CAPABILITY_LIFECYCLE_PROBE, timeoutMs = 15_000L)) { started ->
+                append("RUN accepted: ${describeStatus(started.status)}")
+                val handle = started.handle ?: return@startTask
+                append("unique task identity: taskId=${handle.taskId}")
+                window.decorView.postDelayed({
+                    executor.getStatus(handle) { status -> append("STATUS during run: ${describeStatus(status)}") }
+                }, 3_000L)
+                window.decorView.postDelayed({
+                    append("CANCEL requested: taskId=${handle.taskId}")
+                    executor.cancelTask(handle) { cancelled ->
+                        append("CANCELLED observed: ${describeStatus(cancelled)}")
+                        executor.getStatus(handle) { status -> append("final STATUS: ${describeStatus(status)}") }
+                        executor.getResult(handle) { result -> append("final RESULT / late-result classification: ${describeResult(result)}") }
+                    }
+                }, 6_000L)
+            }
+        } catch (error: Exception) { append("Probe 2 exception: ${error.message}") }
     }
 
     private fun runDiagnostic(cancelFlow: Boolean) {

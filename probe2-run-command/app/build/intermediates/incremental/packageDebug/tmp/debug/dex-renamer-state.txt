@@ -1,0 +1,4 @@
+#Mon Aug 17 09:00:50 UTC 2026
+base.0=/mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/build/intermediates/dex/debug/mergeProjectDexDebug/out/classes.dex
+renamed.0=classes.dex
+path.0=classes.dex

@@ -39,6 +39,11 @@ import com.era.assistant.core.memory.RawBlockCoordinator
 import com.era.assistant.core.memory.SemanticMemoryRetriever
 import com.era.assistant.core.ui.ConversationMessageViewFactory
 import com.era.assistant.core.ui.ConversationViewportController
+import com.era.assistant.core.ui.SearchStatusCardController
+import com.era.assistant.core.ui.SearchPulseView
+import com.era.assistant.core.search.SearchRequestHandle
+import com.era.assistant.core.search.SearchOrchestrator
+import com.era.assistant.core.search.SearchUsageTracker
 import com.era.assistant.core.blackbox.BlackBoxController
 import com.era.assistant.core.blackbox.BlackBoxState
 import com.era.assistant.core.voice.MicInputUiController
@@ -130,6 +135,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chatMessagesContainer: LinearLayout
     private lateinit var conversationMessageViewFactory: ConversationMessageViewFactory
     private lateinit var conversationViewportController: ConversationViewportController
+    private lateinit var searchStatusCardController: SearchStatusCardController
+
+    private val searchOrchestrator = SearchOrchestrator()
+    private var activeSearchRequest: SearchRequestHandle? = null
 
     private lateinit var sideMenu: LinearLayout
     private lateinit var menuScrim: View
@@ -392,6 +401,15 @@ class MainActivity : AppCompatActivity() {
                 bottomFade = findViewById(R.id.conversationBottomFade)
             )
 
+        searchStatusCardController =
+            SearchStatusCardController(
+                card = findViewById(R.id.searchStatusCard),
+                animationView = findViewById<SearchPulseView>(R.id.searchStatusAnimation),
+                cancelView = findViewById(R.id.searchStatusCancel),
+                viewportController = conversationViewportController,
+                onCancel = { cancelActiveSearch() }
+            )
+
         sideMenu =
             findViewById(
                 R.id.sideMenu
@@ -457,6 +475,25 @@ val menuInstructions =
             findViewById<TextView>(
                 R.id.menuLockTest
             )
+
+        val menuSearchPreview =
+            findViewById<TextView>(
+                R.id.menuSearchPreview
+            )
+
+        val menuSearchPreviewDivider =
+            findViewById<View>(
+                R.id.menuSearchPreviewDivider
+            )
+
+        if (BuildConfig.DEBUG) {
+            menuSearchPreview.visibility = View.VISIBLE
+            menuSearchPreviewDivider.visibility = View.VISIBLE
+            menuSearchPreview.setOnClickListener {
+                closeSideMenu()
+                searchStatusCardController.showSearching()
+            }
+        }
 
         micInputUiController =
             MicInputUiController(
@@ -1747,6 +1784,46 @@ sendApiButton.isFocusable =
             memoryContext = memoryContext
         )
 
+        val xaiApiKeyUri =
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                .getString("xai_api_key_uri", null)
+        activeSearchRequest = searchOrchestrator.run(
+            context = this,
+            apiKeyUriString = xaiApiKeyUri,
+            conversationId = conversationId,
+            messageId = lastMessageId,
+            query = message,
+            onSearching = { _ -> runOnUiThread { if (generation == sendGeneration) searchStatusCardController.showSearching() } },
+            onSuccess = { evidence ->
+                runOnUiThread {
+                    if (generation != sendGeneration) return@runOnUiThread
+                    activeSearchRequest = null
+                    searchStatusCardController.hide()
+                    if (evidence != null) SearchUsageTracker(this).record(evidence.usage)
+                    val instructions = if (evidence == null) finalInstructions else finalInstructions + "\n\n" + evidence.toOpenAiContext()
+                    sendOpenAiWithInstructions(generation, message, instructions, apiKeyUri)
+                }
+            },
+            onError = { error ->
+                runOnUiThread {
+                    if (generation != sendGeneration) return@runOnUiThread
+                    activeSearchRequest = null
+                    searchStatusCardController.hide()
+                    isSendingMessage = false
+                    stopMoonPulse()
+                    appendErrorMessage("Поиск не выполнен: " + error)
+                    keepInputActive()
+                }
+            }
+        )
+    }
+
+    private fun sendOpenAiWithInstructions(
+        generation: Long,
+        message: String,
+        instructions: String,
+        apiKeyUri: String
+    ) {
         voiceModeController.onOpenAiRequestStart()
         voiceModeController.onUserMessageSent(message)
         val request = streamingResponseController.sendMessage(
@@ -1754,7 +1831,7 @@ sendApiButton.isFocusable =
             apiKeyUriString = apiKeyUri,
             model = openAiClient.getModel(),
             message = message,
-            instructions = finalInstructions,
+            instructions = instructions,
             onDelta = { delta ->
                 if (generation == sendGeneration) {
                     voiceModeController.onTextDelta(delta)
@@ -1819,6 +1896,17 @@ sendApiButton.isFocusable =
             }
         )
         if (generation == sendGeneration) activeStreamingRequest = request else request.cancel()
+    }
+
+    private fun cancelActiveSearch() {
+        sendGeneration++
+        activeSearchRequest?.cancel()
+        activeSearchRequest = null
+        searchStatusCardController.hide()
+        isSendingMessage = false
+        stopMoonPulse()
+        appendErrorMessage("Поиск отменён")
+        keepInputActive()
     }
 
     private fun cancelActiveVoiceResponse() {
@@ -2458,7 +2546,17 @@ sendApiButton.isFocusable =
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::searchStatusCardController.isInitialized) {
+            searchStatusCardController.onHostResume()
+        }
+    }
+
     override fun onPause() {
+        if (::searchStatusCardController.isInitialized) {
+            searchStatusCardController.onHostPause()
+        }
         if (::voiceModeController.isInitialized && voiceModeController.isActive()) {
             cancelActiveVoiceResponse()
             voiceModeController.onHostPause()
@@ -2467,6 +2565,10 @@ sendApiButton.isFocusable =
     }
 
     override fun onDestroy() {
+
+        if (::searchStatusCardController.isInitialized) {
+            searchStatusCardController.release()
+        }
 
         BlackBoxController.removeListener(blackBoxStateListener)
         blackBoxHandler.removeCallbacksAndMessages(null)

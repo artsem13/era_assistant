@@ -1,0 +1,73 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+	package
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:70-94
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:1-22:12
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#com.termux.permission.RUN_COMMAND
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:3:5-73
+	android:name
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:3:22-70
+application
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:5:5-21:19
+	android:supportsRtl
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:9:9-35
+	android:label
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:6:9-36
+	android:allowBackup
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:8:9-36
+	android:theme
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:7:9-72
+activity#com.era.probe2.MainActivity
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:10:9-17:20
+	android:exported
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:12:13-36
+	android:name
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:11:13-41
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:13:13-16:29
+action#android.intent.action.MAIN
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:14:17-69
+	android:name
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:14:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:15:17-77
+	android:name
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:15:27-74
+receiver#com.era.probe2.CommandResultReceiver
+ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:18:9-20:40
+	android:exported
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:20:13-37
+	android:name
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml:19:13-50
+uses-sdk
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		ADDED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml
+		INJECTED from /mnt/sdcard/Era/Era_From_Zip/probe2-run-command/app/src/main/AndroidManifest.xml

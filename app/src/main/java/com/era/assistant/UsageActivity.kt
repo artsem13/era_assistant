@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
+import com.era.assistant.core.search.SearchUsageTracker
 import java.util.Locale
 
 class UsageActivity : AppCompatActivity() {
@@ -33,6 +34,12 @@ class UsageActivity : AppCompatActivity() {
     private lateinit var terraUsageText: TextView
     private lateinit var miniUsageText: TextView
     private lateinit var solUsageText: TextView
+
+    private lateinit var providerController: UsageProviderController
+    private lateinit var xaiSessionCostText: TextView
+    private lateinit var xaiSessionInputText: TextView
+    private lateinit var xaiSessionOutputText: TextView
+    private lateinit var xaiSearchSummaryText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +81,20 @@ class UsageActivity : AppCompatActivity() {
 
         solUsageText =
             findViewById(R.id.solUsage)
+
+        xaiSessionCostText = findViewById(R.id.xaiSessionCost)
+        xaiSessionInputText = findViewById(R.id.xaiSessionInput)
+        xaiSessionOutputText = findViewById(R.id.xaiSessionOutput)
+        xaiSearchSummaryText = findViewById(R.id.xaiSearchSummary)
+
+        providerController =
+            UsageProviderController(
+                swipeSurface = findViewById(R.id.usageScrollView),
+                openAiPage = findViewById(R.id.openAiPage),
+                xaiPage = findViewById(R.id.xaiPage),
+                openAiTab = findViewById(R.id.openAiTab),
+                xaiTab = findViewById(R.id.xaiTab)
+            )
 
         backButton.setOnClickListener {
             finish()
@@ -210,6 +231,8 @@ class UsageActivity : AppCompatActivity() {
             prefs
         )
 
+        updateXaiUsageDisplay(prefs)
+
         updateModelsUsageDisplay(
             prefs
         )
@@ -320,6 +343,15 @@ class UsageActivity : AppCompatActivity() {
             getReadableModelName(
                 modelForDisplay
             )
+    }
+
+    private fun updateXaiUsageDisplay(prefs: android.content.SharedPreferences) {
+        val ticks = prefs.getLong(SearchUsageTracker.KEY_TICKS, 0L)
+        val usd = ticks.toDouble() / 10_000_000_000.0
+        xaiSessionCostText.text = String.format(Locale.US, "Стоимость xAI          $%.6f", usd)
+        xaiSessionInputText.text = String.format(Locale.US, "Входящие токены        %d", prefs.getLong(SearchUsageTracker.KEY_INPUT, 0L))
+        xaiSessionOutputText.text = String.format(Locale.US, "Исходящие токены       %d", prefs.getLong(SearchUsageTracker.KEY_OUTPUT, 0L))
+        xaiSearchSummaryText.text = String.format(Locale.US, "Запросов Эры: %d\nWeb Search calls: %d\nX Search calls: %d\nСтоимость tools: $%.6f\nТокены: %d\nСтоимость токенов: $%.6f\nВсего: $%.6f", prefs.getLong(SearchUsageTracker.KEY_REQUESTS, 0L), prefs.getLong(SearchUsageTracker.KEY_WEB, 0L), prefs.getLong(SearchUsageTracker.KEY_X, 0L), usd, prefs.getLong(SearchUsageTracker.KEY_TOTAL, 0L), usd, usd)
     }
 
     private fun updateModelsUsageDisplay(
