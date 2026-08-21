@@ -15,15 +15,17 @@ import java.util.Locale
 class SearchRequestHandle {
     @Volatile private var connection: HttpURLConnection? = null
     @Volatile private var cancelled = false
+    @Volatile private var cancelAction: (() -> Unit)? = null
     fun attach(connection: HttpURLConnection) { this.connection = connection; if (cancelled) connection.disconnect() }
-    fun cancel() { cancelled = true; connection?.disconnect() }
+    fun setCancelAction(action: () -> Unit) { cancelAction = action; if (cancelled) action() }
+    fun cancel() { cancelled = true; connection?.disconnect(); cancelAction?.invoke() }
     fun isCancelled(): Boolean = cancelled
 }
 
 class XaiSearchClient(
     private val parser: XaiSearchResponseParser = XaiSearchResponseParser()
 ) {
-    fun search(context: Context, apiKeyUriString: String, query: String, mode: SearchMode, conversationId: String?, messageId: Long?, onSuccess: (EvidenceBundle) -> Unit, onError: (String) -> Unit): SearchRequestHandle {
+    fun search(context: Context, apiKeyUriString: String, query: String, mode: SearchMode, conversationId: String?, messageId: Long?, onSuccess: (EvidenceBundle) -> Unit, onError: (String) -> Unit, originalQuery: String? = null, intentParseMs: Long? = null): SearchRequestHandle {
         val handle = SearchRequestHandle()
         Thread {
             var connection: HttpURLConnection? = null
@@ -51,7 +53,7 @@ class XaiSearchClient(
                 require(!responseText.contains(apiKey)) { "xAI response failed secret scan" }
                 val finished = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
                 val latency = System.currentTimeMillis() - startMs
-                val rawReference = SearchRawArchive(context).save(conversationId, messageId, query, mode, requestJson.toString(), responseText, started, finished, latency, apiKey)
+                val rawReference = SearchRawArchive(context).save(conversationId, messageId, query, mode, requestJson.toString(), responseText, started, finished, latency, apiKey, originalQuery, intentParseMs)
                 onSuccess(parser.parse(responseText, mode, started, finished, latency, rawReference))
             } catch (error: Exception) {
                 if (!handle.isCancelled()) onError(error.message ?: "Ошибка xAI Search")

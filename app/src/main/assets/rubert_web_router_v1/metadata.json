@@ -1,0 +1,59 @@
+{
+  "format_version": "1.0",
+  "base_model": "/data/data/com.termux/files/home/models/rubert-tiny2",
+  "base_model_files": {
+    "model.onnx": {
+      "path": "/data/data/com.termux/files/home/models/rubert-tiny2/model.onnx",
+      "sha256": "96fdb44dbc77f3accf9527d6615983b92e53546f94db02255e3872f74a4c4088",
+      "size_bytes": 116501648
+    },
+    "vocab.txt": {
+      "path": "/data/data/com.termux/files/home/models/rubert-tiny2/vocab.txt",
+      "sha256": "f056a69b097422652053bf87565c35543e5d81540ca4b7dddd28de4157a969e0",
+      "size_bytes": 1080667
+    },
+    "config.json": {
+      "path": "/data/data/com.termux/files/home/models/rubert-tiny2/config.json",
+      "sha256": "adee8b3e344bcb8379f44d0b3577c267d52881341e05d973c43e49974778dfff",
+      "size_bytes": 693
+    }
+  },
+  "embedding_method": "CLS normalized",
+  "embedding_source": "sentence_embedding",
+  "embedding_dimension": 312,
+  "corpus": {
+    "path": "/root/era_orchestrator_corpus_web_policy_v1.csv",
+    "filename": "era_orchestrator_corpus_web_policy_v1.csv",
+    "sha256": "54909232ee4be74dd3819ffa2acb0980486370423f10ffa9967f0d97bfd44599"
+  },
+  "source_of_truth": "label == WEB_SEARCH",
+  "seed": 42,
+  "max_len": 128,
+  "tokenizer_preprocessing": {
+    "implementation": "local basic_tokenize + greedy WordPiece",
+    "lowercase": true,
+    "special_tokens": "[CLS] + tokens[:MAX_LEN-2] + [SEP]",
+    "padding": "[PAD] to MAX_LEN",
+    "attention_mask": "1 for sequence, 0 for padding",
+    "token_type_ids": "not supplied to ONNX, matching diagnostic script",
+    "vocab_path": "/data/data/com.termux/files/home/models/rubert-tiny2/vocab.txt"
+  },
+  "training": {
+    "split": "real-only stratified 80/20; test WEB[:4] and NO_WEB[:54]; remaining rows train",
+    "synthetic_rows": "eligible for training remainder, never selected into test",
+    "classifier": "torch.nn.Linear(312, 1)",
+    "loss": "BCEWithLogitsLoss",
+    "pos_weight": 14.466666666666667,
+    "optimizer": "Adam",
+    "learning_rate": 0.03,
+    "weight_decay": 0.0001,
+    "epochs": 800,
+    "torch_version": "2.6.0+debian",
+    "onnxruntime_version": "1.21",
+    "torch_threads": 1
+  },
+  "label_policy": "WEB only for explicit request for external/current search; otherwise NO_WEB or uncertainty per thresholds",
+  "thresholds_file": "thresholds.json",
+  "classifier_sha256": "15909064eac2825f4ce8f2d0bfc39818bc005a7ccb59d1ced55825944a7495d3",
+  "created_at_utc": "2026-08-21T08:26:22.526496+00:00"
+}

@@ -491,7 +491,12 @@ val menuInstructions =
             menuSearchPreviewDivider.visibility = View.VISIBLE
             menuSearchPreview.setOnClickListener {
                 closeSideMenu()
-                searchStatusCardController.showSearching()
+                startActivity(
+                    Intent().setClassName(
+                        this,
+                        "com.era.assistant.RuBertWebRouterDebugActivity"
+                    )
+                )
             }
         }
 
@@ -1790,9 +1795,11 @@ sendApiButton.isFocusable =
         activeSearchRequest = searchOrchestrator.run(
             context = this,
             apiKeyUriString = xaiApiKeyUri,
+            openAiApiKeyUriString = apiKeyUri,
             conversationId = conversationId,
             messageId = lastMessageId,
             query = message,
+            recentConversationContext = buildRecentSearchContext(),
             onSearching = { _ -> runOnUiThread { if (generation == sendGeneration) searchStatusCardController.showSearching() } },
             onSuccess = { evidence ->
                 runOnUiThread {
@@ -1814,8 +1821,35 @@ sendApiButton.isFocusable =
                     appendErrorMessage("Поиск не выполнен: " + error)
                     keepInputActive()
                 }
+            },
+            onClarification = { clarification ->
+                runOnUiThread {
+                    if (generation != sendGeneration) return@runOnUiThread
+                    activeSearchRequest = null
+                    searchStatusCardController.hide()
+                    val assistantMessageId = conversationArchive.saveAssistantMessage(
+                        conversationId,
+                        clarification,
+                        OpenAiClient.MODEL_ECONOMY
+                    )
+                    if (assistantMessageId != -1L) lastMessageId = assistantMessageId
+                    if (assistantMessageId != -1L) rawBlockCoordinator.onAssistantMessageSaved(conversationId)
+                    appendSphereMessage(clarification)
+                    isSendingMessage = false
+                    stopMoonPulse()
+                    keepInputActive()
+                }
             }
         )
+    }
+
+    private fun buildRecentSearchContext(): String {
+        val messages = conversationArchive.getMessagesForConversation(conversationId)
+            .dropLast(1)
+            .takeLast(6)
+        return messages.joinToString("\n") { message ->
+            "${message.role}: ${message.text.take(600)}"
+        }.takeLast(2400)
     }
 
     private fun sendOpenAiWithInstructions(

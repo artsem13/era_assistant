@@ -15,7 +15,9 @@ class SearchRawArchive(private val context: Context) {
         startedAt: String,
         finishedAt: String,
         latencyMs: Long,
-        apiKey: String
+        apiKey: String,
+        originalQuery: String? = null,
+        intentParseMs: Long? = null
     ): String {
         require(apiKey.isNotBlank() && !responseJson.contains(apiKey)) { "xAI raw response failed secret scan" }
         val directory = File(context.filesDir, "xai_search_raw")
@@ -26,12 +28,14 @@ class SearchRawArchive(private val context: Context) {
             put("conversation_id", conversationId ?: JSONObject.NULL)
             put("message_id", messageId ?: JSONObject.NULL)
             put("query", query)
+            put("original_query", originalQuery ?: JSONObject.NULL)
             put("search_mode", mode.name)
             put("request", JSONObject(requestJson))
             put("response", JSONObject(responseJson))
             put("wall_clock_start", startedAt)
             put("wall_clock_end", finishedAt)
             put("latency_ms", latencyMs)
+            put("intent_parse_ms", intentParseMs ?: JSONObject.NULL)
             put("security", JSONObject().put("api_key_present", false).put("authorization_header_stored", false))
         }
         file.writeText(record.toString(), Charsets.UTF_8)

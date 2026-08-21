@@ -72,6 +72,10 @@ After changing `termux/era-worker.sh` in the repository, the user must deploy th
 
 The current TECNO/HiOS host can suspend or delay background Termux work and callbacks. It is a temporary host, not a guarantee of durable background execution. Termux is an optional trusted local capability executor, not a filesystem sandbox, not a PRoot/Codex host, and not a portable data store. New executors must be able to replace it behind the neutral contract.
 
+## Future agent mode (planned)
+
+Future Era agent mode is planned to use this existing Termux bridge and `RUN_COMMAND` infrastructure as its transport/executor; no parallel bridge is defined for that purpose.
+
 ## Required verification
 
 For bridge changes: targeted source read-back, `bash -n termux/era-worker.sh`, and `git diff --check`. Device tests must separately verify worker deployment, permission/availability, callback, `RUN → STATUS → RESULT`, cancellation and any changed capability. Do not claim a device pass from static inspection.

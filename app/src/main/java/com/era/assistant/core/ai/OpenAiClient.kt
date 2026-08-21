@@ -58,7 +58,8 @@ class OpenAiClient {
         message: String,
         instructions: String,
         onSuccess: (OpenAiResponse) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        responseFormat: JSONObject? = null
     ) {
 
         Thread {
@@ -100,6 +101,13 @@ class OpenAiClient {
                             put(
                                 "instructions",
                                 instructions
+                            )
+                        }
+
+                        responseFormat?.let {
+                            put(
+                                "text",
+                                JSONObject().put("format", it)
                             )
                         }
 
