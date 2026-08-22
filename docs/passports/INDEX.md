@@ -13,6 +13,8 @@ This directory is the authoritative documentation layer for the current reposito
 | [MEMORY.md](MEMORY.md) | Local RAW/archive and long-term memory contract |
 | [SEARCH.md](SEARCH.md) | xAI search routing, evidence archive and usage contract |
 | [USAGE.md](USAGE.md) | OpenAI/xAI usage UI and local counters |
+| [INTERFACE.md](INTERFACE.md) | Актуальный паспорт UI/UX пользовательского интерфейса Era |
+| [DIAGNOSTICS.md](DIAGNOSTICS.md) | Локальный диагностический журнал и экспорт |
 
 Read this file first, then only the passport relevant to the task. Do not treat audits, plans or reports as current instructions.
 

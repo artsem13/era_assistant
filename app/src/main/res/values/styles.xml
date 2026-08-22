@@ -9,7 +9,8 @@
         <item name="colorAccent">@color/colorAccent</item>
 
         <!-- Главный фон самого окна Android -->
-        <item name="android:windowBackground">#000000</item>
+        <!-- Совместимый legacy startup splash: чёрный фон + прозрачный центрированный foreground -->
+        <item name="android:windowBackground">@drawable/bg_legacy_splash</item>
 
         <!-- Общий фон темы -->
         <item name="android:colorBackground">#000000</item>

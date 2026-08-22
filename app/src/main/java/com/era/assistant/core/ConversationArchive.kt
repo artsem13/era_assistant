@@ -7,6 +7,8 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
+import com.era.assistant.core.diagnostics.EraDiagnosticsLogger
 
 class ConversationArchive(
     private val context: Context
@@ -23,7 +25,7 @@ class ConversationArchive(
             "era_conversation_archive.db"
 
         private const val DATABASE_VERSION =
-            2
+            3
 
         const val TABLE_MESSAGES =
             "messages"
@@ -66,6 +68,11 @@ class ConversationArchive(
 
         const val NOTE_COLUMN_TEXT =
             "text"
+
+        const val NOTE_COLUMN_CREATED_LOCAL = "created_local_datetime"
+        const val NOTE_COLUMN_UPDATED = "updated_at"
+        const val NOTE_COLUMN_UPDATED_LOCAL = "updated_local_datetime"
+        const val NOTE_COLUMN_TIMEZONE = "timezone_id"
     }
 
     override fun onCreate(
@@ -94,6 +101,13 @@ class ConversationArchive(
             createResearchNotesTable(
                 db
             )
+        }
+
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE $TABLE_RESEARCH_NOTES ADD COLUMN $NOTE_COLUMN_CREATED_LOCAL TEXT")
+            db.execSQL("ALTER TABLE $TABLE_RESEARCH_NOTES ADD COLUMN $NOTE_COLUMN_UPDATED INTEGER")
+            db.execSQL("ALTER TABLE $TABLE_RESEARCH_NOTES ADD COLUMN $NOTE_COLUMN_UPDATED_LOCAL TEXT")
+            db.execSQL("ALTER TABLE $TABLE_RESEARCH_NOTES ADD COLUMN $NOTE_COLUMN_TIMEZONE TEXT")
         }
     }
 
@@ -128,7 +142,11 @@ class ConversationArchive(
                 $NOTE_COLUMN_CONVERSATION_ID TEXT NOT NULL,
                 $NOTE_COLUMN_MESSAGE_ID INTEGER,
                 $NOTE_COLUMN_TIMESTAMP INTEGER NOT NULL,
-                $NOTE_COLUMN_TEXT TEXT NOT NULL
+                $NOTE_COLUMN_TEXT TEXT NOT NULL,
+                $NOTE_COLUMN_CREATED_LOCAL TEXT,
+                $NOTE_COLUMN_UPDATED INTEGER,
+                $NOTE_COLUMN_UPDATED_LOCAL TEXT,
+                $NOTE_COLUMN_TIMEZONE TEXT
             )
         """.trimIndent()
 
@@ -140,7 +158,8 @@ class ConversationArchive(
     fun saveUserMessage(
         conversationId: String,
         text: String,
-        source: String = "text"
+        source: String = "text",
+        timestamp: Long = System.currentTimeMillis()
     ): Long {
 
         val values =
@@ -163,7 +182,7 @@ class ConversationArchive(
 
         values.put(
             COLUMN_TIMESTAMP,
-            System.currentTimeMillis()
+            timestamp
         )
 
         values.put(
@@ -195,7 +214,8 @@ class ConversationArchive(
     fun saveAssistantMessage(
         conversationId: String,
         text: String,
-        model: String
+        model: String,
+        timestamp: Long = System.currentTimeMillis()
     ): Long {
 
         val values =
@@ -218,7 +238,7 @@ class ConversationArchive(
 
         values.put(
             COLUMN_TIMESTAMP,
-            System.currentTimeMillis()
+            timestamp
         )
 
         values.put(
@@ -250,7 +270,8 @@ class ConversationArchive(
     fun saveResearchNote(
         conversationId: String,
         messageId: Long?,
-        text: String
+        text: String,
+        timestamp: Long = System.currentTimeMillis()
     ): Long {
 
         val values =
@@ -279,13 +300,18 @@ class ConversationArchive(
 
         values.put(
             NOTE_COLUMN_TIMESTAMP,
-            System.currentTimeMillis()
+            timestamp
         )
 
         values.put(
             NOTE_COLUMN_TEXT,
             text
         )
+        val zone = TimeZone.getDefault()
+        values.put(NOTE_COLUMN_CREATED_LOCAL, SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply { timeZone = zone }.format(Date(timestamp)))
+        values.put(NOTE_COLUMN_UPDATED, timestamp)
+        values.put(NOTE_COLUMN_UPDATED_LOCAL, SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US).apply { timeZone = zone }.format(Date(timestamp)))
+        values.put(NOTE_COLUMN_TIMEZONE, zone.id)
 
         val rowId =
             writableDatabase.insert(

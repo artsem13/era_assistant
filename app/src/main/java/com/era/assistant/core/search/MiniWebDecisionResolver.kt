@@ -1,6 +1,7 @@
 package com.era.assistant.core.search
 
 import android.content.Context
+import com.era.assistant.core.ai.DeviceDateTimeContext
 import com.era.assistant.core.ai.OpenAiClient
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,10 +18,17 @@ data class MiniWebDecision(
     val clarification: String? = null
 )
 
+internal data class MiniWebRequestContext(
+    val userQuery: String,
+    val recentContext: String,
+    val currentDeviceDateTime: String
+)
+
 class MiniWebDecisionResolver(
     private val openAiClientFactory: () -> OpenAiClient = {
         OpenAiClient().apply { setModel(OpenAiClient.MODEL_ECONOMY) }
-    }
+    },
+    private val deviceDateTimeContext: DeviceDateTimeContext = DeviceDateTimeContext()
 ) {
     fun resolve(
         context: Context,
@@ -31,9 +39,11 @@ class MiniWebDecisionResolver(
         onSuccess: (MiniWebDecision) -> Unit,
         onFailure: (String) -> Unit
     ) {
+        val requestContext = buildRequestContext(userQuery, recentContext)
         val payload = JSONObject()
-            .put("user_query", userQuery.take(MAX_QUERY_LENGTH))
-            .put("recent_context", recentContext.takeLast(MAX_CONTEXT_LENGTH))
+            .put("user_query", requestContext.userQuery)
+            .put("recent_context", requestContext.recentContext)
+            .put("current_device_datetime", requestContext.currentDeviceDateTime)
 
         openAiClientFactory().sendMessage(
             context = context,
@@ -55,14 +65,30 @@ class MiniWebDecisionResolver(
         )
     }
 
+    internal fun buildRequestContext(userQuery: String, recentContext: String): MiniWebRequestContext {
+        return MiniWebRequestContext(
+            userQuery = userQuery.take(MAX_QUERY_LENGTH),
+            recentContext = recentContext.takeLast(MAX_CONTEXT_LENGTH),
+            currentDeviceDateTime = deviceDateTimeContext.format()
+        )
+    }
+
     companion object {
         private const val MAX_QUERY_LENGTH = 500
         private const val MAX_CONTEXT_LENGTH = 2400
         private const val MAX_SEARCH_QUERY_LENGTH = 500
         private const val MAX_CLARIFICATION_LENGTH = 240
 
-        private const val INSTRUCTIONS = """
-Реши только, нужен ли внешний актуальный WEB-поиск для текущего сообщения. Используй небольшой контекст. Само упоминание интернета, технологий, сайтов или известных людей не означает WEB. Явный запрет поиска всегда означает NO_WEB. Для WEB верни самостоятельный короткий поисковый запрос, понятный без истории. Если объект поиска нельзя надёжно определить, верни CLARIFY_USER и короткий вопрос. Верни только JSON по схеме.
+        internal const val INSTRUCTIONS = """
+Ты — contextual resolver и query rewriter для актуального WEB-поиска. Не отвечай пользователю и не пиши объяснений: верни только JSON по схеме.
+
+Определи intent текущего сообщения с учётом bounded recent_context. Если текущая реплика содержит местоимение, эллипсис или ссылку вроде «у них», «она», «это», восстанови объект, товар и релевантное место из контекста, если antecedent достаточно однозначен. Самостоятельный запрос с понятным объектом не нужно переписывать через историю только ради усложнения.
+
+Если объект и общий тип информации понятны, выбирай разумный полезный default и возвращай WEB. Широкий запрос — не причина для уточнения: общий запрос о новостях означает широкую сводку значимых событий, общий запрос о новых моделях означает актуальные основные релизы/изменения, без выдуманного узкого интереса. Не спрашивай про магазин, модель или категорию, если полезный широкий поиск уже возможен. Сохраняй реальные ограничения пользователя, добавляй location если он известен и релевантен, учитывай свежесть для «сейчас», «сегодня», «последнее», «новости» и «новые».
+
+Поле current_device_datetime — текущее локальное системное время устройства пользователя в ISO 8601, а также дата, время, день недели и timezone. Используй его только для разрешения относительных временных выражений и их отражения в query, когда это действительно релевантно; не добавляй точную дату или время в каждый query механически.
+
+Для WEB верни самостоятельный короткий поисковый query, понятный без истории: убери разговорную оболочку, но не выдумывай факты и не сужай широкий intent. Для NO_WEB не нужны поля query/clarification. CLARIFY_USER — последний вариант: используй его только если без уточнения невозможно определить объект или выполнить даже полезный широкий поиск, например «посмотри это» при нескольких возможных antecedents или «сколько это стоит» без товара/услуги в контексте. Если запрос понятен обычному человеку, действуй.
 """
 
         fun parseResponse(text: String): MiniWebDecision {

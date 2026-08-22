@@ -12,20 +12,22 @@ user message
   → AUTO_NO_WEB: ordinary conversation path, without network WEB
   → AUTO_WEB: existing SearchIntentParser → xAI WEB pipeline
   → MINI_FALLBACK: GPT-5 Mini with recent conversation context
-       → WEB + self-contained query → existing SearchIntentParser → xAI WEB pipeline
+       → WEB + self-contained query → xAI WEB pipeline (Mini query bypasses SearchIntentParser)
        → NO_WEB: ordinary conversation path
        → CLARIFY_USER: short clarification in the ordinary chat
        → selected main OpenAI Sphere model
        → natural final answer to the user
 ```
 
-The policy is fixed for this phase: `p_web <= 0.20` → `AUTO_NO_WEB`; `p_web >= 0.80` → `AUTO_WEB`; values between the thresholds → `MINI_FALLBACK`.
+The policy is fixed for this phase: `p_web <= 0.20` → `AUTO_NO_WEB`; `p_web >= 0.80` → `AUTO_WEB`; values between the thresholds → `MINI_FALLBACK`. The thresholds are loaded from `assets/rubert_web_router_v1/thresholds.json` and must equal `0.20` / `0.80`; the asset status still says `initial_policy_not_finally_validated_on_device`.
 
 `SearchOrchestrator` uses `SearchDecisionController` to select `NO_SEARCH`, `GENERAL_WEB`, `SOCIAL_REALTIME_X` or `BOTH`. `XaiSearchClient` calls `https://api.x.ai/v1/responses` with model `grok-4.3`, low reasoning effort, sequential bounded tool calls and a 2 MiB response limit. Parsed evidence is appended to the existing OpenAI instruction path; OpenAI remains the final conversation response path.
 
-After `AUTO_WEB` or Mini `WEB`, `SearchIntentParser` is a separate task making a separate OpenAI Responses API call using `gpt-5-mini`. Its payload contains only the original user query and `SearchMode`; it does not receive conversation history, RAW memory blocks, structured memory, Sphere instructions or previous search evidence. Its separate instructions and JSON schema normalize the natural-language request into a bounded query, intent, required facts and optional location. The normalized query becomes the xAI input. The original query is retained in Search RAW alongside the actual query sent to xAI. Parser latency is stored as `intent_parse_ms`.
+After `AUTO_WEB`, `SearchIntentParser` is a separate task making a separate OpenAI Responses API call using `gpt-5-mini`. Its payload contains only the original user query and `SearchMode`; it does not receive conversation history, RAW memory blocks, structured memory, Sphere instructions or previous search evidence. Its separate instructions and JSON schema normalize the natural-language request into a bounded query, intent, required facts and optional location. The normalized query becomes the xAI input. The original query is retained in Search RAW alongside the actual query sent to xAI. Parser latency is stored as `intent_parse_ms`. A Mini `WEB` result bypasses this parser because Mini already returns a self-contained query.
 
-For `MINI_FALLBACK`, `MiniWebDecisionResolver` uses the existing `OpenAiClient` with model `gpt-5-mini`, strict structured JSON output and a bounded recent context from `ConversationArchive` (six latest previous messages, maximum 2400 characters). Its only outputs are `WEB` with a self-contained `search_query`, `NO_WEB`, or `CLARIFY_USER` with a short question. It is called only after RuBERT returns `MINI_FALLBACK`. Mini does not answer the main user question and does not access memory routing.
+For `MINI_FALLBACK`, `MiniWebDecisionResolver` uses the existing `OpenAiClient` with model `gpt-5-mini`, strict structured JSON output and a bounded recent context from `ConversationArchive` (six latest previous messages, maximum 2400 characters). Its request is capped at 500 characters for the current query and 2400 characters for recent context, and includes a freshly generated `DeviceDateTimeContext` on every resolve call. Its only outputs are `WEB` with a self-contained `search_query`, `NO_WEB`, or `CLARIFY_USER` with a short question. It is called only after RuBERT returns `MINI_FALLBACK`. Mini is a contextual resolver/query rewriter and clarification gate; it does not answer the main user question and does not access memory routing.
+
+For a broad but understandable current-information request, the Mini instructions require a useful broad WEB query and a sensible default rather than unnecessary clarification. Entity/antecedent resolution may use the bounded recent context. `CLARIFY_USER` is the last resort when the object cannot be determined even for a useful broad search. Relative dates such as today, yesterday, now and recent are resolved using the phone-local `DeviceDateTimeContext`, not server time.
 
 `MemoryCompiler` and `SearchIntentParser` happen to use the same `gpt-5-mini` model, but are logically and API-architecturally independent: they have separate API calls, instructions, payloads, schemas, parsing, lifecycle and state. The search parser is not combined with memory processing and is not a shared mini-processing request.
 
@@ -64,9 +66,17 @@ The policy prioritizes avoiding an unrequested external search. Discussion of th
 
 Real web/internet search is enabled by the centralized `SearchFeatureFlags.WEB_SEARCH_ENABLED` flag in `app/src/main/java/com/era/assistant/core/search/SearchFeatureFlags.kt`.
 
-For a current search candidate, `SearchOrchestrator` checks the existing decision, optionally runs the separate `SearchIntentParser` with `gpt-5-mini`, and passes the normalized query (or the original query on parser failure) to `XaiSearchClient`. The client calls `https://api.x.ai/v1/responses` with the configured `web_search`/`x_search` tools. `EvidenceBundle` is then appended to the existing main OpenAI instruction path, where the selected Sphere model produces the user-facing answer.
+For a current search candidate, `SearchOrchestrator` checks the existing decision, optionally runs the separate `SearchIntentParser` with `gpt-5-mini`, and passes the normalized query (or the original query on parser failure) to `XaiSearchClient`. A Mini `WEB` decision already contains a self-contained query and passes it directly to `XaiSearchClient` without a second parser call. The client calls `https://api.x.ai/v1/responses` with the configured `web_search`/`x_search` tools. `EvidenceBundle` is then appended to the existing main OpenAI instruction path, where the selected Sphere model produces the user-facing answer.
 
 For `NO_SEARCH`, `SearchOrchestrator` calls `onSuccess(null)` and the ordinary OpenAI conversation path continues without the search parser or xAI search client. The flag is the only current web-search gate; `XaiSearchClient` is reached through `SearchOrchestrator`, and the remaining xAI/OpenAI clients are independent subsystems.
+
+## Next routing architecture stage
+
+The current WEB routing remains production and its RuBERT weights, thresholds (`0.20` / `0.80`), Mini resolver and xAI path are unchanged. A stateless first-turn limitation is known: short follow-ups can be classified before the Mini layer sees the relevant history.
+
+`RouteState` is now a compact session-scoped context (not durable user memory). It tracks a generic tool (`WEB`, with `MEMORY` and `ACTION` reserved), pending clarification/confirmation or recent result, a short topic, the last assistant act, source turn and a finite TTL. WEB clarification/result callbacks update it; explicit search negation clears the pending WEB state. A recent result does not by itself make a new standalone request inherit WEB.
+
+`ContextDependencyEvaluator` defines the future `STANDALONE` / `CONTEXT_DEPENDENT` / `UNCERTAIN` boundary. No new classifier head is loaded or used for production routing. `RouteShadowPolicy` evaluates the future safety rule in debug shadow mode only: low `p_web` can yield `AUTO_NO_WEB` only for standalone input with no pending tool task; otherwise the result is `MINI` (with explicit directives handled by the deterministic policy). This shadow policy is not production routing.
 
 The current implementation requires the existing xAI API-key URI for an actual search. `SearchOrchestrator` runs the cached local RuBERT WEB Router before any remote decision, off the UI thread, reusing one ONNX session per orchestrator. Mini load/API/malformed-response failures log `MINI_WEB_RUNTIME_FALLBACK` and use `SearchDecisionController`; RuBERT runtime failures use the same safe fallback. No failure crashes the application.
 
@@ -88,6 +98,12 @@ MAX_ABS_DIFF: 0.000000558
 Manual device validation confirmed explicit WEB search, no false WEB for ordinary conversation, no WEB from Qwen mention alone, Mini use of previous context, Mini clarification, and real search after Mini=`WEB`.
 
 The RuBERT self-test is preserved as a debug diagnostic tool, not a production routing UI. It may later be extended for other local RuBERT tasks, including the memory subsystem.
+
+### Diagnostic and research evidence
+
+The production WEB route emits diagnostic events through the separate local diagnostics database; this does not alter routing. The current event correlation is best-effort: the MainActivity user/assistant events share a turn id, while the RuBERT decision currently lacks the conversation/turn identifiers passed to `SearchOrchestrator`, so a completely guaranteed chain is not yet implemented.
+
+The repository does not contain `era_web_stage_clean_v1.csv`, `era_web_context_stage_clean_v1.csv` or `era_pending_web_continuation_clean_v1.csv` at this audit. No claim is made that these datasets were created, used for training, or shipped as production assets. No second RuBERT context-dependency head exists in production.
 
 ## Phase Status
 

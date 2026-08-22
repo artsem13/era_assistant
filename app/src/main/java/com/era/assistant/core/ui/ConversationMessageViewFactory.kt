@@ -16,28 +16,31 @@ class ConversationMessageViewFactory(
 
     data class MessageView(
         val row: View,
-        val bubble: TextView
+        val bubble: TextView,
+        val timestamp: TextView
     )
 
     private val density = context.resources.displayMetrics.density
 
-    fun createUserMessage(message: String): MessageView {
+    fun createUserMessage(message: String, timestamp: Long = 0L): MessageView {
         return createMessage(
             message,
             Color.parseColor("#F2F2F2"),
             Color.parseColor("#2A2A2A"),
             Gravity.END,
-            maxWidthFraction = 0.84f
+            maxWidthFraction = 0.84f,
+            timestamp = timestamp
         )
     }
 
-    fun createSphereMessage(message: String = ""): MessageView {
+    fun createSphereMessage(message: String = "", timestamp: Long = 0L): MessageView {
         return createMessage(
             message,
             Color.parseColor("#EAEAEA"),
             Color.parseColor("#1C1C1E"),
             Gravity.START,
-            horizontalBoundsView = inputField
+            horizontalBoundsView = inputField,
+            timestamp = timestamp
         )
     }
 
@@ -47,14 +50,15 @@ class ConversationMessageViewFactory(
         bubbleColor: Int,
         gravity: Int,
         maxWidthFraction: Float? = null,
-        horizontalBoundsView: View? = null
+        horizontalBoundsView: View? = null,
+        timestamp: Long
     ): MessageView {
         val bubble = TextView(context)
         bubble.text = message
         bubble.setTextColor(textColor)
         bubble.textSize = 16f
         bubble.setLineSpacing(dp(3).toFloat(), 1f)
-        bubble.setPadding(dp(16), dp(11), dp(16), dp(11))
+        bubble.setPadding(0, 0, 0, 0)
         bubble.setTextIsSelectable(true)
         bubble.setHorizontallyScrolling(false)
         bubble.isSingleLine = false
@@ -63,11 +67,35 @@ class ConversationMessageViewFactory(
         background.shape = GradientDrawable.RECTANGLE
         background.setColor(bubbleColor)
         background.cornerRadius = dp(20).toFloat()
-        bubble.background = background
+        val timestampView = TextView(context)
+        timestampView.setTextColor(Color.parseColor("#777777"))
+        timestampView.textSize = 11f
+        timestampView.gravity = Gravity.END
+        timestampView.includeFontPadding = false
+        timestampView.text = MessageTimestampFormatter.format(timestamp)
+        timestampView.visibility = if (timestampView.text.isNullOrEmpty()) View.GONE else View.VISIBLE
+
+        val bubbleContent = ConversationMessageBubble(context)
+        bubbleContent.orientation = LinearLayout.VERTICAL
+        bubbleContent.background = background
+        bubbleContent.setPadding(dp(16), dp(11), dp(16), dp(8))
+        bubbleContent.addView(
+            bubble,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        val timestampParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        timestampParams.topMargin = dp(4)
+        bubbleContent.addView(timestampView, timestampParams)
 
         val row = ConversationMessageRow(
             context,
-            bubble,
+            bubbleContent,
             gravity,
             dp(4),
             maxWidthFraction,
@@ -81,7 +109,7 @@ class ConversationMessageViewFactory(
         rowParams.bottomMargin = dp(6)
         row.layoutParams = rowParams
 
-        return MessageView(row, bubble)
+        return MessageView(row, bubble, timestampView)
     }
 
     private fun dp(value: Int): Int {
@@ -91,7 +119,7 @@ class ConversationMessageViewFactory(
 
 private class ConversationMessageRow(
     context: Context,
-    private val bubble: TextView,
+    private val bubble: View,
     private val gravity: Int,
     private val outerMarginPx: Int,
     private val maxWidthFraction: Float?,
@@ -189,8 +217,26 @@ private class ConversationMessageRow(
     }
 
     private fun setBubbleMaxWidth(maxWidth: Int) {
-        if (bubble.maxWidth != maxWidth) {
-            bubble.maxWidth = maxWidth
+        (bubble as? ConversationMessageBubble)?.maxWidthPx = maxWidth
+    }
+}
+
+private class ConversationMessageBubble(
+    context: Context
+) : LinearLayout(context) {
+
+    var maxWidthPx: Int = Int.MAX_VALUE
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (maxWidthPx != Int.MAX_VALUE && MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY) {
+            val size = MeasureSpec.getSize(widthMeasureSpec)
+            val cappedWidth = minOf(maxWidthPx, size)
+            super.onMeasure(
+                MeasureSpec.makeMeasureSpec(cappedWidth, MeasureSpec.AT_MOST),
+                heightMeasureSpec
+            )
+        } else {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         }
     }
 }

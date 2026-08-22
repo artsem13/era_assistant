@@ -11,6 +11,7 @@ import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.era.assistant.core.diagnostics.EraDiagnosticsLogger
 
 class SearchRequestHandle {
     @Volatile private var connection: HttpURLConnection? = null
@@ -23,9 +24,11 @@ class SearchRequestHandle {
 }
 
 class XaiSearchClient(
-    private val parser: XaiSearchResponseParser = XaiSearchResponseParser()
+    private val parser: XaiSearchResponseParser = XaiSearchResponseParser(),
+    private val diagnosticsLogger: EraDiagnosticsLogger? = null
 ) {
-    fun search(context: Context, apiKeyUriString: String, query: String, mode: SearchMode, conversationId: String?, messageId: Long?, onSuccess: (EvidenceBundle) -> Unit, onError: (String) -> Unit, originalQuery: String? = null, intentParseMs: Long? = null): SearchRequestHandle {
+    fun search(context: Context, apiKeyUriString: String, query: String, mode: SearchMode, conversationId: String?, messageId: Long?, onSuccess: (EvidenceBundle) -> Unit, onError: (String) -> Unit, originalQuery: String? = null, intentParseMs: Long? = null, diagnostics: EraDiagnosticsLogger? = diagnosticsLogger): SearchRequestHandle {
+        android.util.Log.i("XaiSearchClient", "WEB_QUERY_TO_CLIENT length=${query.length} query=$query")
         val handle = SearchRequestHandle()
         Thread {
             var connection: HttpURLConnection? = null
@@ -35,6 +38,7 @@ class XaiSearchClient(
                 val apiKey = readApiKey(context, apiKeyUriString)
                 if (apiKey.isBlank()) { onError("Файл xAI API-ключа пустой"); return@Thread }
                 val requestJson = createRequest(query, mode)
+                diagnostics?.record("WEB_SEARCH_REQUEST", JSONObject().put("provider", "xAI").put("search_query", query).put("request_start_epoch_ms", startMs).put("source_route", "AUTO_WEB"), conversationId, "turn-${messageId ?: query.hashCode()}", messageId?.toString())
                 connection = URL(API_URL).openConnection() as HttpURLConnection
                 handle.attach(connection!!)
                 connection!!.requestMethod = "POST"
@@ -54,9 +58,16 @@ class XaiSearchClient(
                 val finished = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date())
                 val latency = System.currentTimeMillis() - startMs
                 val rawReference = SearchRawArchive(context).save(conversationId, messageId, query, mode, requestJson.toString(), responseText, started, finished, latency, apiKey, originalQuery, intentParseMs)
-                onSuccess(parser.parse(responseText, mode, started, finished, latency, rawReference))
+                val evidence = parser.parse(responseText, mode, started, finished, latency, rawReference)
+                android.util.Log.i("XaiSearchClient", "WEB_RESULT_STATUS success actions=${evidence.searchActions.size} sources=${evidence.encounteredSources.size}")
+                diagnostics?.record("WEB_SEARCH_RESULT", JSONObject().put("provider", "xAI").put("success", true).put("duration_ms", latency).put("result_count", evidence.encounteredSources.size), conversationId, "turn-${messageId ?: query.hashCode()}", messageId?.toString())
+                onSuccess(evidence)
             } catch (error: Exception) {
-                if (!handle.isCancelled()) onError(error.message ?: "Ошибка xAI Search")
+                if (!handle.isCancelled()) {
+                    diagnostics?.record("WEB_SEARCH_RESULT", JSONObject().put("provider", "xAI").put("success", false).put("duration_ms", System.currentTimeMillis() - startMs).put("error_type", error.javaClass.simpleName), conversationId, "turn-${messageId ?: query.hashCode()}", messageId?.toString())
+                    android.util.Log.w("XaiSearchClient", "WEB_RESULT_STATUS error")
+                    onError(error.message ?: "Ошибка xAI Search")
+                }
             } finally { connection?.disconnect() }
         }.start()
         return handle

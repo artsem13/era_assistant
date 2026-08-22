@@ -2,6 +2,10 @@ package com.era.assistant
 
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class ResearchNoteController(
     private val activity: AppCompatActivity,
@@ -26,7 +30,7 @@ class ResearchNoteController(
                 messageIdProvider()
 
             val rowId =
-                notesStore.saveNote(
+            notesStore.saveNote(
                     conversationId = conversationId,
                     messageId = messageId,
                     text = noteText
@@ -38,7 +42,7 @@ class ResearchNoteController(
 
                 Toast.makeText(
                     activity,
-                    "Заметка сохранена",
+                    "Заметка сохранена — ${SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).apply { timeZone = TimeZone.getDefault() }.format(Date())}",
                     Toast.LENGTH_SHORT
                 ).show()
 

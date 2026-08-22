@@ -63,7 +63,7 @@ class PulseRingAnimator(
         if (active) return
         active = true
         ring.alpha = DIM_ALPHA
-        onPulseAlphaChanged?.invoke(if (iconReady) 255 else 0)
+        onPulseAlphaChanged?.invoke(255)
         button.foreground = ring
         handler.post(pulse)
     }
@@ -75,18 +75,18 @@ class PulseRingAnimator(
         animator = null
         ring.alpha = 0
         iconPulseEnabled = false
-        onPulseAlphaChanged?.invoke(0)
+        onPulseAlphaChanged?.invoke(255)
         button.foreground = null
     }
 
     fun setIconReady(ready: Boolean) {
         iconReady = ready
-        if (!iconPulseEnabled) onPulseAlphaChanged?.invoke(if (ready) 255 else 0)
+        if (!iconPulseEnabled) onPulseAlphaChanged?.invoke(255)
     }
 
     fun setIconPulseEnabled(enabled: Boolean) {
         iconPulseEnabled = enabled
-        if (!enabled) onPulseAlphaChanged?.invoke(if (iconReady) 255 else 0)
+        if (!enabled) onPulseAlphaChanged?.invoke(255)
         else onPulseAlphaChanged?.invoke(ring.alpha)
     }
 

@@ -27,6 +27,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.era.assistant.core.ai.OpenAiClient
 import com.era.assistant.core.ai.OpenAiResponse
 import com.era.assistant.core.ai.OpenAiStreamingClient
+import com.era.assistant.core.ai.DeviceDateTimeContext
 import com.era.assistant.core.ai.StreamingResponseController
 import com.era.assistant.core.ai.StreamingRequestHandle
 import com.era.assistant.core.ai.UsageCalculator
@@ -39,6 +40,7 @@ import com.era.assistant.core.memory.RawBlockCoordinator
 import com.era.assistant.core.memory.SemanticMemoryRetriever
 import com.era.assistant.core.ui.ConversationMessageViewFactory
 import com.era.assistant.core.ui.ConversationViewportController
+import com.era.assistant.core.ui.MessageTimestampFormatter
 import com.era.assistant.core.ui.SearchStatusCardController
 import com.era.assistant.core.ui.SearchPulseView
 import com.era.assistant.core.search.SearchRequestHandle
@@ -48,6 +50,8 @@ import com.era.assistant.core.blackbox.BlackBoxController
 import com.era.assistant.core.blackbox.BlackBoxState
 import com.era.assistant.core.voice.MicInputUiController
 import com.era.assistant.core.voice.VoiceModeController
+import com.era.assistant.core.diagnostics.EraDiagnosticsLogger
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -137,7 +141,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var conversationViewportController: ConversationViewportController
     private lateinit var searchStatusCardController: SearchStatusCardController
 
-    private val searchOrchestrator = SearchOrchestrator()
+    private lateinit var searchOrchestrator: SearchOrchestrator
+    private lateinit var diagnosticsLogger: EraDiagnosticsLogger
     private var activeSearchRequest: SearchRequestHandle? = null
 
     private lateinit var sideMenu: LinearLayout
@@ -172,6 +177,8 @@ class MainActivity : AppCompatActivity() {
     private var menuIsOpen =
         false
 
+    private var diagnosticTurnId: String? = null
+
     private val openAiClient =
         OpenAiClient()
 
@@ -179,6 +186,9 @@ class MainActivity : AppCompatActivity() {
         StreamingResponseController(
             OpenAiStreamingClient()
         )
+
+    private val deviceDateTimeContext =
+        DeviceDateTimeContext()
 
     private val moonPulseHandler =
         Handler(
@@ -286,6 +296,9 @@ class MainActivity : AppCompatActivity() {
             savedInstanceState
         )
 
+        diagnosticsLogger = EraDiagnosticsLogger(applicationContext)
+        searchOrchestrator = SearchOrchestrator(diagnosticsLogger = diagnosticsLogger)
+
         setContentView(
             R.layout.activity_main
         )
@@ -349,7 +362,8 @@ class MainActivity : AppCompatActivity() {
 
         researchNotesStore =
             ResearchNotesStore(
-                conversationArchive
+                conversationArchive,
+                diagnosticsLogger
             )
 
         researchNoteController =
@@ -678,14 +692,16 @@ sendApiButton.isFocusable =
                 "user" -> {
 
                     appendUserMessage(
-                        message.text
+                        message.text,
+                        message.timestamp
                     )
                 }
 
                 "assistant" -> {
 
                     appendSphereMessage(
-                        message.text
+                        message.text,
+                        message.timestamp
                     )
                 }
             }
@@ -700,11 +716,12 @@ sendApiButton.isFocusable =
     }
 
     private fun appendUserMessage(
-        message: String
+        message: String,
+        timestamp: Long = 0L
     ) {
         val messageView =
             conversationMessageViewFactory
-                .createUserMessage(message)
+                .createUserMessage(message, timestamp)
 
         chatMessagesContainer.addView(
             messageView.row
@@ -714,11 +731,12 @@ sendApiButton.isFocusable =
     }
 
     private fun appendSphereMessage(
-        message: String
+        message: String,
+        timestamp: Long = 0L
     ) {
         val messageView =
             conversationMessageViewFactory
-                .createSphereMessage(message)
+                .createSphereMessage(message, timestamp)
 
         chatMessagesContainer.addView(
             messageView.row
@@ -1727,14 +1745,19 @@ sendApiButton.isFocusable =
         voiceModeController.onMemoryRetrievalStart()
 
         val baseInstructions = loadSphereInstructions()
+        val userTimestamp = System.currentTimeMillis()
         val userMessageId = conversationArchive.saveUserMessage(
             conversationId = conversationId,
             text = message,
-            source = source
+            source = source,
+            timestamp = userTimestamp
         )
         if (userMessageId != -1L) lastMessageId = userMessageId
+        val turnId = "turn-${userMessageId.takeIf { it != -1L } ?: System.currentTimeMillis()}"
+        diagnosticTurnId = turnId
+        diagnosticsLogger.record("USER_MESSAGE", JSONObject().put("message_text", message).put("source", source.toUpperCase(java.util.Locale.US).ifBlank { "UNKNOWN" }), conversationId, turnId, userMessageId.takeIf { it != -1L }?.toString())
 
-        appendUserMessage(message)
+        appendUserMessage(message, userTimestamp)
         if (source == "text") messageInput.text.clear()
         keepInputActive()
         startMoonPulse()
@@ -1827,14 +1850,17 @@ sendApiButton.isFocusable =
                     if (generation != sendGeneration) return@runOnUiThread
                     activeSearchRequest = null
                     searchStatusCardController.hide()
+                    val assistantTimestamp = System.currentTimeMillis()
                     val assistantMessageId = conversationArchive.saveAssistantMessage(
                         conversationId,
                         clarification,
-                        OpenAiClient.MODEL_ECONOMY
+                        OpenAiClient.MODEL_ECONOMY,
+                        assistantTimestamp
                     )
                     if (assistantMessageId != -1L) lastMessageId = assistantMessageId
                     if (assistantMessageId != -1L) rawBlockCoordinator.onAssistantMessageSaved(conversationId)
-                    appendSphereMessage(clarification)
+                    diagnosticsLogger.record("ASSISTANT_MESSAGE", JSONObject().put("message_text", clarification).put("model", OpenAiClient.MODEL_ECONOMY), conversationId, diagnosticTurnId, assistantMessageId.takeIf { it != -1L }?.toString())
+                    appendSphereMessage(clarification, assistantTimestamp)
                     isSendingMessage = false
                     stopMoonPulse()
                     keepInputActive()
@@ -1865,7 +1891,9 @@ sendApiButton.isFocusable =
             apiKeyUriString = apiKeyUri,
             model = openAiClient.getModel(),
             message = message,
-            instructions = instructions,
+            instructions = instructions +
+                "\n\nSYSTEM/RUNTIME CONTEXT:\n" +
+                deviceDateTimeContext.format(),
             onDelta = { delta ->
                 if (generation == sendGeneration) {
                     voiceModeController.onTextDelta(delta)
@@ -1886,22 +1914,28 @@ sendApiButton.isFocusable =
                 if (generation == sendGeneration) {
                     activeStreamingRequest = null
                     voiceModeController.onResponseCompleted(response.text)
+                    val assistantTimestamp = System.currentTimeMillis()
                     val assistantMessageId = conversationArchive.saveAssistantMessage(
                         conversationId = conversationId,
                         text = response.text,
-                        model = response.model
+                        model = response.model,
+                        timestamp = assistantTimestamp
                     )
                     if (assistantMessageId != -1L) {
                         lastMessageId = assistantMessageId
                         rawBlockCoordinator.onAssistantMessageSaved(conversationId)
                     }
+                    diagnosticsLogger.record("ASSISTANT_MESSAGE", JSONObject().put("message_text", response.text).put("model", response.model), conversationId, turnId = diagnosticTurnId, messageId = assistantMessageId.takeIf { it != -1L }?.toString())
                     saveSessionUsage(response)
                     runOnUiThread {
                         val messageView = activeStreamingMessageView
                         if (messageView != null) {
                             messageView.bubble.text = response.text
+                            messageView.timestamp.text = MessageTimestampFormatter.format(assistantTimestamp)
+                            messageView.timestamp.visibility =
+                                if (messageView.timestamp.text.isNullOrEmpty()) View.GONE else View.VISIBLE
                         } else {
-                            appendSphereMessage(response.text)
+                            appendSphereMessage(response.text, assistantTimestamp)
                         }
                         activeStreamingMessageView = null
                         isSendingMessage = false

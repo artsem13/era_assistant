@@ -154,91 +154,107 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <!-- ГАМБУРГЕР -->
+            <LinearLayout
+                android:id="@+id/leftControls"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/menuButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_menu_button"
-                android:gravity="center"
-                android:includeFontPadding="false"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:padding="0dp"
-                android:text="☰"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="22sp" />
+                <Button
+                    android:id="@+id/menuButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_menu_button"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="0dp"
+                    android:text="☰"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp" />
 
-            <!-- ЗАМЕТКИ -->
+                <ImageButton
+                    android:id="@+id/noteButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_menu_button"
+                    android:contentDescription="Заметка"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:padding="13dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_note_pen"
+                    android:tint="#FFFFFF" />
+            </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/noteButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginLeft="6dp"
-                android:background="@drawable/bg_menu_button"
-                android:contentDescription="Заметка"
-                android:focusable="false"
-                android:focusableInTouchMode="false"
-                android:padding="13dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_note_pen"
-                android:tint="#FFFFFF" />
-
-            <TextView
-                android:id="@+id/blackBoxIndicator"
+            <FrameLayout
+                android:id="@+id/centerControls"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:gravity="center"
-                android:textColor="#FF9A9A"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                android:gravity="center">
 
-            <!-- РАЗОВЫЙ STT -->
+                <TextView
+                    android:id="@+id/blackBoxIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:textColor="#FF9A9A"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </FrameLayout>
 
-            <ImageButton
-                android:id="@+id/micButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginRight="6dp"
-                android:background="@drawable/bg_menu_button"
-                android:contentDescription="Микрофон"
-                android:focusable="false"
-                android:focusableInTouchMode="false"
-                android:padding="12dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_mic"
-                android:tint="#FFFFFF" />
-
-            <!-- ГОЛОСОВОЙ РЕЖИМ -->
-
-            <ImageButton
-                android:id="@+id/voiceModeButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_menu_button"
-                android:contentDescription="Голосовой режим"
-                android:focusable="false"
-                android:focusableInTouchMode="false"
-                android:padding="12dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_voice_mode"
-                android:tint="#FFFFFF" />
-
-            <Button
-                android:id="@+id/interruptButton"
+            <LinearLayout
+                android:id="@+id/rightControls"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginLeft="6dp"
-                android:background="@drawable/bg_menu_button"
-                android:text="INTERRUPT"
-                android:textColor="#FFFFFF"
-                android:textSize="9sp"
-                android:visibility="gone" />
+                android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/interruptButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_menu_button"
+                    android:text="INTERRUPT"
+                    android:textColor="#FFFFFF"
+                    android:textSize="9sp"
+                    android:visibility="gone" />
+
+                <ImageButton
+                    android:id="@+id/micButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_menu_button"
+                    android:contentDescription="Микрофон"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:padding="12dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_mic"
+                    android:tint="#FFFFFF" />
+
+                <ImageButton
+                    android:id="@+id/voiceModeButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_menu_button"
+                    android:contentDescription="Голосовой режим"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false"
+                    android:padding="12dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_voice_mode"
+                    android:tint="#FFFFFF" />
+            </LinearLayout>
 
         </LinearLayout>
 
